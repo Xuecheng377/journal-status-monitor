@@ -2,7 +2,12 @@ name: 期刊状态监控
 
 on:
   schedule:
-    - cron: '0 1,9,17 * * *'  # UTC时间 1:00, 9:00, 17:00 (北京时间 9:00, 17:00, 1:00)
+    # 北京时间 9:00 - 每日报告
+    - cron: '0 1 * * *'  # UTC 1:00 = 北京 9:00
+    # 北京时间 17:00 - 只在有变化时通知
+    - cron: '0 9 * * *'  # UTC 9:00 = 北京 17:00
+    # 北京时间次日 1:00 - 只在有变化时通知
+    - cron: '0 17 * * *'  # UTC 17:00 = 北京次日 1:00
   
   workflow_dispatch:
     inputs:
@@ -14,6 +19,7 @@ on:
         options:
           - normal
           - test
+          - daily_report
 
 jobs:
   monitor:
@@ -58,17 +64,31 @@ jobs:
           HEADLESS: true
         run: |
           MODE="${{ github.event.inputs.mode || 'normal' }}"
+          CURRENT_HOUR=$(TZ='Asia/Shanghai' date '+%H')
           
           echo "=========================================="
           echo "运行模式: $MODE"
           echo "时间: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
+          echo "当前小时: $CURRENT_HOUR"
           echo "=========================================="
           
           if [ "$MODE" = "test" ]; then
             echo "🧪 测试模式：发送测试邮件"
             python -c "from notification import EmailNotifier; EmailNotifier().send_test_email()"
+          elif [ "$MODE" = "daily_report" ]; then
+            echo "📊 每日报告模式：无论是否有变化都发送邮件"
+            export DAILY_REPORT=true
+            python monitor.py
           else
             echo "🚀 正常模式：执行监控任务"
+            # 判断是否为北京时间9:00（每日报告时间）
+            if [ "$CURRENT_HOUR" = "09" ]; then
+              echo "📊 每日报告时间：发送所有稿件状态"
+              export DAILY_REPORT=true
+            else
+              echo "🔍 普通监控：只在状态变化时发送邮件"
+              export DAILY_REPORT=false
+            fi
             python monitor.py
           fi
       
