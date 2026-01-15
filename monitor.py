@@ -114,15 +114,42 @@ class JournalMonitor:
                 # 点击登录按钮
                 login_button = None
                 try:
-                    login_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Log In')] | //input[@value='Log In']")
+                    # 方式1：通过按钮文本查找
+                    login_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Log In')]")
+                    print("✅ 通过按钮文本找到登录按钮")
                 except:
                     try:
-                        login_button = self.driver.find_element(By.NAME, "login")
+                        # 方式2：通过input value查找
+                        login_button = self.driver.find_element(By.XPATH, "//input[@value='Log In']")
+                        print("✅ 通过input value找到登录按钮")
                     except:
-                        login_button = self.driver.find_element(By.XPATH, "//button[@type='submit'] | //input[@type='submit']")
+                        try:
+                            # 方式3：通过name属性查找
+                            login_button = self.driver.find_element(By.NAME, "login")
+                            print("✅ 通过name属性找到登录按钮")
+                        except:
+                            try:
+                                # 方式4：查找所有button和input，然后过滤
+                                buttons = self.driver.find_elements(By.XPATH, "//button | //input[@type='submit'] | //input[@type='button']")
+                                for btn in buttons:
+                                    btn_text = btn.text or btn.get_attribute('value') or ''
+                                    if 'log in' in btn_text.lower():
+                                        login_button = btn
+                                        print(f"✅ 通过遍历找到登录按钮: {btn_text}")
+                                        break
+                                if not login_button:
+                                    raise Exception("未找到登录按钮")
+                            except:
+                                # 方式5：直接按Enter键
+                                print("⚠️  未找到登录按钮，尝试按Enter键")
+                                password_input.send_keys("\n")  # 按Enter键
+                                login_button = None
                 
-                login_button.click()
-                print("✅ 已点击登录按钮")
+                if login_button:
+                    login_button.click()
+                    print("✅ 已点击登录按钮")
+                else:
+                    print("✅ 已按Enter键提交")
                 
             except Exception as e:
                 print(f"❌ 登录输入失败: {e}")
