@@ -462,12 +462,28 @@ class JournalMonitor:
                 print("\n🔍 正在对比状态变化...")
                 changed_manuscripts = self.storage.compare_and_update(all_manuscripts)
                 
+                # 判断是否为每日第一次运行（北京时间9:00）
+                from datetime import datetime
+                import os
+                current_hour = datetime.now().hour
+                is_daily_report = os.getenv('DAILY_REPORT', 'false').lower() == 'true'
+                
                 # 发送通知
-                if changed_manuscripts:
-                    print(f"\n📬 检测到 {len(changed_manuscripts)} 篇稿件状态变化")
-                    self.notifier.send_change_notification(changed_manuscripts)
+                if is_daily_report:
+                    # 每日报告模式：无论是否有变化都发送邮件
+                    print("\n📊 每日报告模式：发送所有稿件状态")
+                    self.notifier.send_daily_report(all_manuscripts)
+                    if changed_manuscripts:
+                        print(f"\n📬 检测到 {len(changed_manuscripts)} 篇稿件状态变化")
+                        for ms in changed_manuscripts:
+                            print(f"  • {ms.get('title', '未知')}: {ms.get('old_status', '未知')} → {ms.get('new_status', '未知')}")
                 else:
-                    print("\n✅ 所有稿件状态无变化")
+                    # 普通模式：只在有变化时发送邮件
+                    if changed_manuscripts:
+                        print(f"\n📬 检测到 {len(changed_manuscripts)} 篇稿件状态变化")
+                        self.notifier.send_change_notification(changed_manuscripts)
+                    else:
+                        print("\n✅ 所有稿件状态无变化")
             else:
                 print("\n⚠️  未获取到任何稿件，请检查账户配置或页面结构")
             

@@ -247,6 +247,212 @@ class EmailNotifier:
 """
         return text
     
+    def send_daily_report(self, all_manuscripts: List[Dict]) -> bool:
+        """
+        发送每日定时报告邮件
+        
+        Args:
+            all_manuscripts: 所有稿件列表
+        
+        Returns:
+            是否发送成功
+        """
+        if not all_manuscripts:
+            print("ℹ️  没有稿件，无需发送报告")
+            return True
+        
+        try:
+            # 创建邮件
+            message = MIMEMultipart('alternative')
+            message['From'] = Header(f"期刊状态监控 <{self.sender}>", 'utf-8')
+            message['To'] = Header(self.receiver, 'utf-8')
+            message['Subject'] = Header(
+                f"📊 期刊稿件每日报告 ({len(all_manuscripts)}篇)",
+                'utf-8'
+            )
+            
+            # 生成邮件内容
+            html_content = self._generate_daily_report_html(all_manuscripts)
+            text_content = self._generate_daily_report_text(all_manuscripts)
+            
+            # 添加纯文本和HTML版本
+            part1 = MIMEText(text_content, 'plain', 'utf-8')
+            part2 = MIMEText(html_content, 'html', 'utf-8')
+            message.attach(part1)
+            message.attach(part2)
+            
+            # 发送邮件
+            print(f"📧 正在发送每日报告邮件到 {self.receiver}...")
+            
+            if self.smtp_port == 465:
+                # SSL连接
+                server = smtplib.SMTP_SSL(self.smtp_host, self.smtp_port)
+            else:
+                # TLS连接
+                server = smtplib.SMTP(self.smtp_host, self.smtp_port)
+                server.starttls()
+            
+            server.login(self.sender, self.password)
+            server.sendmail(self.sender, [self.receiver], message.as_string())
+            server.quit()
+            
+            print("✅ 每日报告邮件发送成功！")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 每日报告邮件发送失败: {e}")
+            return False
+    
+    def _generate_daily_report_html(self, all_manuscripts: List[Dict]) -> str:
+        """生成每日报告HTML格式的邮件内容"""
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        .header {{
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }}
+        .header h1 {{
+            margin: 0;
+            font-size: 24px;
+        }}
+        .header p {{
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+        }}
+        .manuscript {{
+            background: #f8f9fa;
+            border-left: 4px solid #11998e;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }}
+        .manuscript-title {{
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }}
+        .manuscript-info {{
+            font-size: 14px;
+            color: #555;
+            margin: 5px 0;
+        }}
+        .status {{
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            background: #27ae60;
+            color: white;
+        }}
+        .footer {{
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #999;
+            text-align: center;
+        }}
+        .badge {{
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }}
+        .badge-ieee {{
+            background: #0066cc;
+            color: white;
+        }}
+        .badge-elsevier {{
+            background: #ff6600;
+            color: white;
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 期刊稿件每日报告</h1>
+        <p>当前共有 {len(all_manuscripts)} 篇稿件</p>
+    </div>
+"""
+        
+        for i, manuscript in enumerate(all_manuscripts, 1):
+            source = manuscript.get('source', '未知')
+            badge_class = 'badge-ieee' if 'IEEE' in source.upper() else 'badge-elsevier'
+            
+            html += f"""
+    <div class="manuscript">
+        <div class="manuscript-title">
+            {i}. {manuscript.get('title', '未知标题')}
+        </div>
+        <div class="manuscript-info">
+            <span class="badge {badge_class}">{source}</span>
+            稿件ID: {manuscript.get('id', '未知')}
+        </div>
+        <div class="manuscript-info" style="margin-top: 8px;">
+            <strong>当前状态：</strong>
+            <span class="status">{manuscript.get('status', '未知')}</span>
+        </div>
+    </div>
+"""
+        
+        html += f"""
+    <div class="footer">
+        <p>此邮件由期刊状态监控系统自动发送</p>
+        <p>生成时间: {current_time}</p>
+    </div>
+</body>
+</html>
+"""
+        return html
+    
+    def _generate_daily_report_text(self, all_manuscripts: List[Dict]) -> str:
+        """生成每日报告纯文本格式的邮件内容"""
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        text = f"""
+期刊稿件每日报告
+{'=' * 50}
+
+当前共有 {len(all_manuscripts)} 篇稿件
+
+"""
+        
+        for i, manuscript in enumerate(all_manuscripts, 1):
+            text += f"""
+{i}. {manuscript.get('title', '未知标题')}
+   来源: {manuscript.get('source', '未知')}
+   稿件ID: {manuscript.get('id', '未知')}
+   当前状态: {manuscript.get('status', '未知')}
+
+"""
+        
+        text += f"""
+{'=' * 50}
+此邮件由期刊状态监控系统自动发送
+生成时间: {current_time}
+"""
+        return text
+    
     def send_test_email(self) -> bool:
         """发送测试邮件"""
         try:
