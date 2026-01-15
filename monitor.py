@@ -69,7 +69,8 @@ class JournalMonitor:
         try:
             # 访问ScholarOne登录页面
             print("🔗 访问ScholarOne登录页面...")
-            login_url = "https://mc.manuscriptcentral.com/tnnls-ieee"
+            login_url = self.config.IEEE_URL
+            print(f"🎯 目标网址: {login_url}")
             
             self.driver.get(login_url)
             time.sleep(2)
@@ -149,8 +150,8 @@ class JournalMonitor:
         Returns:
             稿件列表
         """
-        if not self.config.ELSEVIER_EMAIL or not self.config.ELSEVIER_PASSWORD:
-            print("⚠️  未配置Elsevier账户，跳过")
+        if not self.config.ELSEVIER_EMAIL or not self.config.ELSEVIER_PASSWORD or not self.config.ELSEVIER_URL:
+            print("⚠️  未配置Elsevier账户或期刊网址，跳过")
             return []
         
         print("\n" + "=" * 50)
@@ -162,7 +163,8 @@ class JournalMonitor:
         try:
             # 访问Editorial Manager登录页面
             print("🔗 访问Editorial Manager登录页面...")
-            login_url = "https://www.editorialmanager.com/login.asp"
+            login_url = self.config.ELSEVIER_URL
+            print(f"🎯 目标网址: {login_url}")
             
             self.driver.get(login_url)
             time.sleep(2)

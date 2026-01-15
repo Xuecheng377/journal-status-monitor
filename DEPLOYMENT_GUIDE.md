@@ -76,16 +76,22 @@
 
 | Secret 名称         | 说明                                    | 是否必填 |
 | ------------------- | --------------------------------------- | -------- |
-| `IEEE_EMAIL`        | IEEE (ScholarOne) 登录邮箱              | 可选*    |
-| `IEEE_PASSWORD`     | IEEE (ScholarOne) 登录密码              | 可选*    |
+| `IEEE_EMAIL`        | IEEE (ScholarOne) 登录邮箱                    | 可选*    |
+| `IEEE_PASSWORD`     | IEEE (ScholarOne) 登录密码                    | 可选*    |
+| `IEEE_URL`          | IEEE期刊的ScholarOne网址                     | 可选*    |
 | `ELSEVIER_EMAIL`    | Elsevier (Editorial Manager) 登录邮箱   | 可选*    |
 | `ELSEVIER_PASSWORD` | Elsevier (Editorial Manager) 登录密码   | 可选*    |
+| `ELSEVIER_URL`      | Elsevier期刊的Editorial Manager网址    | 可选*    |
 | `EMAIL_SENDER`      | 发件邮箱地址                            | **必填** |
 | `EMAIL_PASSWORD`    | 发件邮箱的 SMTP 授权码                  | **必填** |
 | `EMAIL_RECEIVER`    | 收件邮箱地址                            | **必填** |
 
 > **注意**：
-> - 标记为"可选*"的项至少需要配置一组（IEEE 或 Elsevier）
+> - 标记为“可选*”的项至少需要配置一组（IEEE 或 Elsevier），每组必须包括邮箱、密码和期刊网址
+> - **重要**：不同的期刊使用不同的网址，请确保配置您投稿期刊的实际网址：
+>   - IEEE TIE: `https://mc.manuscriptcentral.com/tie-ieee`
+>   - IEEE TNNLS: `https://mc.manuscriptcentral.com/tnnls-ieee`
+>   - IEEE TPAMI: `https://mc.manuscriptcentral.com/tpami-cs`
 > - `EMAIL_PASSWORD` 是 SMTP 授权码，不是邮箱登录密码
 > - 如果只监控一个平台，另一个平台的配置可以留空
 

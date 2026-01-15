@@ -25,14 +25,19 @@
 | ------------------- | -------------------------------------------------- | ------------------------------------ |
 | `IEEE_EMAIL`        | 您的 IEEE (ScholarOne) 登录邮箱                    | `your_name@example.com`              |
 | `IEEE_PASSWORD`     | 您的 IEEE (ScholarOne) 登录密码                    | `your_ieee_password`                 |
+| `IEEE_URL`          | 您投稿的IEEE期刊的ScholarOne网址              | `https://mc.manuscriptcentral.com/tie-ieee` |
 | `ELSEVIER_EMAIL`    | 您的 Elsevier (Editorial Manager) 登录邮箱         | `your_name@example.com`              |
 | `ELSEVIER_PASSWORD` | 您的 Elsevier (Editorial Manager) 登录密码         | `your_elsevier_password`             |
+| `ELSEVIER_URL`      | 您投稿的Elsevier期刊的Editorial Manager网址 | `https://www.editorialmanager.com/your-journal` |
 | `EMAIL_SENDER`      | 用于发送通知的邮箱地址                             | `your_sender@qq.com`                 |
 | `EMAIL_PASSWORD`    | 发件邮箱的 **SMTP授权码** (注意：不是登录密码)     | `abcdefg123456789`                   |
 | `EMAIL_RECEIVER`    | 用于接收通知的邮箱地址                             | `your_receiver@example.com`          |
 
 > **注意**:
 > - 如果您只监控一个平台（如仅 IEEE），另一个平台的账户信息可以留空，但至少需要配置一个。
+> - **重要**：不同的期刊使用不同的ScholarOne或Editorial Manager网址，请确保配置您投稿期刊的实际网址。例如：
+>   - IEEE TIE: `https://mc.manuscriptcentral.com/tie-ieee`
+>   - IEEE TNNLS: `https://mc.manuscriptcentral.com/tnnls-ieee`
 > - 如何获取邮箱的SMTP授权码，请参考您邮箱服务商的帮助文档（例如：[QQ邮箱](https://service.mail.qq.com/cgi-bin/help?id=28), [163邮箱](http://help.163.com/09/1223/14/5R7P3QI100753VB8.html)）。
 
 ### 3. 启用 Actions

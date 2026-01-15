@@ -12,10 +12,12 @@ class Config:
     # IEEE账户配置
     IEEE_EMAIL: Optional[str] = os.getenv('IEEE_EMAIL')
     IEEE_PASSWORD: Optional[str] = os.getenv('IEEE_PASSWORD')
+    IEEE_URL: Optional[str] = os.getenv('IEEE_URL')  # IEEE期刊的ScholarOne网址
     
     # Elsevier账户配置
     ELSEVIER_EMAIL: Optional[str] = os.getenv('ELSEVIER_EMAIL')
     ELSEVIER_PASSWORD: Optional[str] = os.getenv('ELSEVIER_PASSWORD')
+    ELSEVIER_URL: Optional[str] = os.getenv('ELSEVIER_URL')  # Elsevier期刊的Editorial Manager网址
     
     # 邮件配置
     EMAIL_SENDER: Optional[str] = os.getenv('EMAIL_SENDER')
@@ -37,8 +39,11 @@ class Config:
         required_fields = []
         
         # 检查是否至少配置了一个期刊账户
-        if not (cls.IEEE_EMAIL and cls.IEEE_PASSWORD) and not (cls.ELSEVIER_EMAIL and cls.ELSEVIER_PASSWORD):
-            required_fields.append('IEEE或Elsevier账户')
+        ieee_configured = cls.IEEE_EMAIL and cls.IEEE_PASSWORD and cls.IEEE_URL
+        elsevier_configured = cls.ELSEVIER_EMAIL and cls.ELSEVIER_PASSWORD and cls.ELSEVIER_URL
+        
+        if not ieee_configured and not elsevier_configured:
+            required_fields.append('IEEE或Elsevier账户（包括邮箱、密码和期刊网址）')
         
         # 检查邮件配置
         if not cls.EMAIL_SENDER or not cls.EMAIL_PASSWORD:
@@ -87,7 +92,11 @@ class Config:
         print("当前配置:")
         print("=" * 50)
         print(f"IEEE账户: {cls.IEEE_EMAIL if cls.IEEE_EMAIL else '未配置'}")
+        if cls.IEEE_URL:
+            print(f"IEEE期刊网址: {cls.IEEE_URL}")
         print(f"Elsevier账户: {cls.ELSEVIER_EMAIL if cls.ELSEVIER_EMAIL else '未配置'}")
+        if cls.ELSEVIER_URL:
+            print(f"Elsevier期刊网址: {cls.ELSEVIER_URL}")
         print(f"发件邮箱: {cls.EMAIL_SENDER}")
         print(f"收件邮箱: {cls.EMAIL_RECEIVER}")
         smtp_host, smtp_port = cls.get_smtp_config()
