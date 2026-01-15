@@ -77,20 +77,58 @@ class JournalMonitor:
             
             # 输入用户名
             print("📝 输入登录信息...")
-            email_input = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.ID, "login"))
-            )
-            email_input.clear()
-            email_input.send_keys(self.config.IEEE_EMAIL)
-            
-            # 输入密码
-            password_input = self.driver.find_element(By.ID, "password")
-            password_input.clear()
-            password_input.send_keys(self.config.IEEE_PASSWORD)
-            
-            # 点击登录按钮
-            login_button = self.driver.find_element(By.NAME, "login")
-            login_button.click()
+            try:
+                # 尝试多种方式查找用户名输入框
+                email_input = None
+                try:
+                    email_input = WebDriverWait(self.driver, 5).until(
+                        EC.presence_of_element_located((By.ID, "login"))
+                    )
+                except:
+                    try:
+                        email_input = self.driver.find_element(By.NAME, "login")
+                    except:
+                        try:
+                            email_input = self.driver.find_element(By.XPATH, "//input[@type='text' or @type='email']")
+                        except:
+                            email_input = self.driver.find_element(By.XPATH, "//input[contains(@placeholder, 'User') or contains(@placeholder, 'ID')]")
+                
+                email_input.clear()
+                email_input.send_keys(self.config.IEEE_EMAIL)
+                print("✅ 用户名已输入")
+                
+                # 输入密码
+                password_input = None
+                try:
+                    password_input = self.driver.find_element(By.ID, "password")
+                except:
+                    try:
+                        password_input = self.driver.find_element(By.NAME, "password")
+                    except:
+                        password_input = self.driver.find_element(By.XPATH, "//input[@type='password']")
+                
+                password_input.clear()
+                password_input.send_keys(self.config.IEEE_PASSWORD)
+                print("✅ 密码已输入")
+                
+                # 点击登录按钮
+                login_button = None
+                try:
+                    login_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Log In')] | //input[@value='Log In']")
+                except:
+                    try:
+                        login_button = self.driver.find_element(By.NAME, "login")
+                    except:
+                        login_button = self.driver.find_element(By.XPATH, "//button[@type='submit'] | //input[@type='submit']")
+                
+                login_button.click()
+                print("✅ 已点击登录按钮")
+                
+            except Exception as e:
+                print(f"❌ 登录输入失败: {e}")
+                print(f"📝 当前页面标题: {self.driver.title}")
+                print(f"🔗 当前页面URL: {self.driver.current_url}")
+                raise
             
             print("⏳ 等待登录...")
             time.sleep(3)
@@ -123,7 +161,7 @@ class JournalMonitor:
                 time.sleep(2)
                 
                 try:
-                    # 尝试多种方式查找稿件表格
+                    # 根据截图，稿件表格的列顺序是：STATUS, ID, TITLE, CREATED, SUBMITTED
                     manuscript_rows = []
                     
                     # 方式1：查找带有data属性的表格行
@@ -139,7 +177,7 @@ class JournalMonitor:
                         # 过滤掉表头行
                         manuscript_rows = [row for row in all_rows if len(row.find_elements(By.TAG_NAME, "td")) >= 3]
                     
-                    print(f"📄 找到 {len(manuscript_rows)} 篇稿件")
+                    print(f"📄 找到 {len(manuscript_rows)} 行数据")
                     
                     if len(manuscript_rows) == 0:
                         print("⚠️  未找到稿件列表，可能需要调整XPath")
@@ -152,13 +190,17 @@ class JournalMonitor:
                             if len(cells) < 3:
                                 continue
                             
-                            # 尝试提取稿件信息（通常前几列是：稿件号、标题、状态）
-                            manuscript_id = cells[0].text.strip()
-                            title = cells[1].text.strip()
-                            status = cells[2].text.strip() if len(cells) > 2 else "未知状态"
+                            # 根据截图，列顺序是：STATUS(0), ID(1), TITLE(2), CREATED(3), SUBMITTED(4)
+                            status = cells[0].text.strip() if len(cells) > 0 else "未知状态"
+                            manuscript_id = cells[1].text.strip() if len(cells) > 1 else ""
+                            title = cells[2].text.strip() if len(cells) > 2 else ""
                             
-                            # 过滤掉空行或表头行
-                            if not manuscript_id or not title or manuscript_id.lower() in ['manuscript', 'id', '#']:
+                            # 过滤掉空行、表头行或非稿件行
+                            if not manuscript_id or not title:
+                                continue
+                            if manuscript_id.lower() in ['manuscript', 'id', '#', 'status']:
+                                continue
+                            if status.lower() in ['status', 'id', 'title']:
                                 continue
                             
                             manuscripts.append({
@@ -169,7 +211,7 @@ class JournalMonitor:
                                 'url': self.driver.current_url
                             })
                             
-                            print(f"  ✓ {manuscript_id}: {title} - {status}")
+                            print(f"  ✓ [{status}] {manuscript_id}: {title}")
                             
                         except Exception as e:
                             print(f"  ⚠️  解析稿件信息失败: {e}")
