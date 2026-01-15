@@ -44,8 +44,10 @@ jobs:
         env:
           IEEE_EMAIL: ${{ secrets.IEEE_EMAIL }}
           IEEE_PASSWORD: ${{ secrets.IEEE_PASSWORD }}
+          IEEE_URL: ${{ secrets.IEEE_URL }}
           ELSEVIER_EMAIL: ${{ secrets.ELSEVIER_EMAIL }}
           ELSEVIER_PASSWORD: ${{ secrets.ELSEVIER_PASSWORD }}
+          ELSEVIER_URL: ${{ secrets.ELSEVIER_URL }}
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
