@@ -96,26 +96,70 @@ class JournalMonitor:
             time.sleep(3)
             
             # 检查是否登录成功
-            if "Author" in self.driver.title or "Dashboard" in self.driver.title:
+            if "ScholarOne" in self.driver.title or "Manuscripts" in self.driver.title:
                 print("✅ IEEE登录成功")
+                
+                # 点击Author按钮进入作者仪表板
+                print("👉 点击Author按钮...")
+                try:
+                    author_button = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable((By.LINK_TEXT, "Author"))
+                    )
+                    author_button.click()
+                    time.sleep(3)
+                    print("✅ 已进入作者仪表板")
+                except Exception as e:
+                    print(f"⚠️  未找到Author按钮，尝试其他方式: {e}")
+                    # 尝试通过其他方式查找Author链接
+                    try:
+                        author_link = self.driver.find_element(By.XPATH, "//a[contains(text(), 'Author') or contains(@href, 'author')]")
+                        author_link.click()
+                        time.sleep(3)
+                    except:
+                        print("⚠️  无法找到Author入口，尝试直接查找稿件")
                 
                 # 查找稿件列表
                 print("🔍 正在查找稿件...")
                 time.sleep(2)
                 
                 try:
-                    manuscript_rows = self.driver.find_elements(By.XPATH, "//table[@id='manuscriptTable']//tr[contains(@class, 'manuscriptRow')]")
+                    # 尝试多种方式查找稿件表格
+                    manuscript_rows = []
+                    
+                    # 方式1：查找带有data属性的表格行
+                    manuscript_rows = self.driver.find_elements(By.XPATH, "//table//tr[@class='data' or @class='data-even' or @class='data-odd']")
                     
                     if not manuscript_rows:
-                        manuscript_rows = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'manuscript')]")
+                        # 方式2：查找包含manuscript的表格行
+                        manuscript_rows = self.driver.find_elements(By.XPATH, "//table//tr[contains(@class, 'manuscript')]")
+                    
+                    if not manuscript_rows:
+                        # 方式3：查找包含稿件信息的所有表格行（排除表头）
+                        all_rows = self.driver.find_elements(By.XPATH, "//table//tr[td]")
+                        # 过滤掉表头行
+                        manuscript_rows = [row for row in all_rows if len(row.find_elements(By.TAG_NAME, "td")) >= 3]
                     
                     print(f"📄 找到 {len(manuscript_rows)} 篇稿件")
                     
+                    if len(manuscript_rows) == 0:
+                        print("⚠️  未找到稿件列表，可能需要调整XPath")
+                        print("📝 当前页面标题:", self.driver.title)
+                        print("🔗 当前页面URL:", self.driver.current_url)
+                    
                     for row in manuscript_rows:
                         try:
-                            manuscript_id = row.find_element(By.XPATH, ".//td[contains(@class, 'manuscriptId')]").text.strip()
-                            title = row.find_element(By.XPATH, ".//td[contains(@class, 'title')]").text.strip()
-                            status = row.find_element(By.XPATH, ".//td[contains(@class, 'status')]").text.strip()
+                            cells = row.find_elements(By.TAG_NAME, "td")
+                            if len(cells) < 3:
+                                continue
+                            
+                            # 尝试提取稿件信息（通常前几列是：稿件号、标题、状态）
+                            manuscript_id = cells[0].text.strip()
+                            title = cells[1].text.strip()
+                            status = cells[2].text.strip() if len(cells) > 2 else "未知状态"
+                            
+                            # 过滤掉空行或表头行
+                            if not manuscript_id or not title or manuscript_id.lower() in ['manuscript', 'id', '#']:
+                                continue
                             
                             manuscripts.append({
                                 'id': manuscript_id,
