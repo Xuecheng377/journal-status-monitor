@@ -216,6 +216,11 @@ class JournalMonitor:
                             cells = row.find_elements(By.TAG_NAME, "td")
                             print(f"  行 {idx+1}: 找到 {len(cells)} 列")
                             
+                            # 输出每一列的HTML结构（前100个字符）
+                            for i, cell in enumerate(cells[:5]):  # 只输出前5列
+                                cell_html = cell.get_attribute('innerHTML')[:100] if cell.get_attribute('innerHTML') else ''
+                                print(f"    列{i}: HTML=[{cell_html}...]")
+                            
                             if len(cells) < 3:
                                 print(f"    跳过：列数不足")
                                 continue
