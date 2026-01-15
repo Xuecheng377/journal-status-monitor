@@ -221,13 +221,13 @@ class JournalMonitor:
                                 cell_html = cell.get_attribute('innerHTML')[:100] if cell.get_attribute('innerHTML') else ''
                                 print(f"    列{i}: HTML=[{cell_html}...]")
                             
-                            if len(cells) < 3:
-                                print(f"    跳过：列数不足")
+                            if len(cells) < 5:  # 需要至少5列才能提取STATUS, ID, TITLE
+                                print(f"    跳过：列数不足（需要至少5列）")
                                 continue
                             
-                            # 根据截图，列顺序是：STATUS(0), ID(1), TITLE(2), CREATED(3), SUBMITTED(4)
-                            # STATUS列可能包含多个元素，需要提取最后的状态信息
-                            status_cell = cells[0] if len(cells) > 0 else None
+                            # 根据实际HTML结构，列顺序是：列0(复杂结构), 列1(图标), 列2(STATUS), 列3(ID), 列4(TITLE)
+                            # STATUS在第2列
+                            status_cell = cells[2] if len(cells) > 2 else None
                             status = "未知状态"
                             if status_cell:
                                 # 尝试查找状态按钮或链接
@@ -245,10 +245,10 @@ class JournalMonitor:
                                         lines = [l.strip() for l in status.split('\n') if l.strip()]
                                         status = lines[-1] if lines else "未知状态"
                             
-                            # ID列
+                            # ID在第3列
                             manuscript_id = ""
-                            if len(cells) > 1:
-                                id_cell = cells[1]
+                            if len(cells) > 3:
+                                id_cell = cells[3]
                                 # 尝试查找id_cell中的所有文本
                                 manuscript_id = id_cell.text.strip()
                                 # 如果为空，尝试查找子元素
@@ -260,10 +260,10 @@ class JournalMonitor:
                                             manuscript_id = elem_text
                                             break
                             
-                            # TITLE列
+                            # TITLE在第4列
                             title = ""
-                            if len(cells) > 2:
-                                title_cell = cells[2]
+                            if len(cells) > 4:
+                                title_cell = cells[4]
                                 # 尝试查找title_cell中的所有文本
                                 title = title_cell.text.strip()
                                 # 如果为空，尝试查找链接或其他元素
