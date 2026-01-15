@@ -211,10 +211,13 @@ class JournalMonitor:
                         print("📝 当前页面标题:", self.driver.title)
                         print("🔗 当前页面URL:", self.driver.current_url)
                     
-                    for row in manuscript_rows:
+                    for idx, row in enumerate(manuscript_rows):
                         try:
                             cells = row.find_elements(By.TAG_NAME, "td")
+                            print(f"  行 {idx+1}: 找到 {len(cells)} 列")
+                            
                             if len(cells) < 3:
+                                print(f"    跳过：列数不足")
                                 continue
                             
                             # 根据截图，列顺序是：STATUS(0), ID(1), TITLE(2), CREATED(3), SUBMITTED(4)
@@ -222,12 +225,17 @@ class JournalMonitor:
                             manuscript_id = cells[1].text.strip() if len(cells) > 1 else ""
                             title = cells[2].text.strip() if len(cells) > 2 else ""
                             
+                            print(f"    原始数据: STATUS=[{status}], ID=[{manuscript_id}], TITLE=[{title[:50] if title else ''}]")
+                            
                             # 过滤掉空行、表头行或非稿件行
                             if not manuscript_id or not title:
+                                print(f"    跳过：ID或标题为空")
                                 continue
                             if manuscript_id.lower() in ['manuscript', 'id', '#', 'status']:
+                                print(f"    跳过：表头行 (ID={manuscript_id})")
                                 continue
                             if status.lower() in ['status', 'id', 'title']:
+                                print(f"    跳过：表头行 (STATUS={status})")
                                 continue
                             
                             manuscripts.append({
