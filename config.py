@@ -26,7 +26,7 @@ class Config:
     
     # SMTP配置（自动识别）
     SMTP_HOST: Optional[str] = os.getenv('SMTP_HOST')
-    SMTP_PORT: int = int(os.getenv('SMTP_PORT', '465'))
+    SMTP_PORT: int = int(os.getenv('SMTP_PORT') or '465')  # 如果为空则使用默认值
     
     # 其他配置
     LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
