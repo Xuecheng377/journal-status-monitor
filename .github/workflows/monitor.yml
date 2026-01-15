@@ -1,0 +1,85 @@
+name: 期刊状态监控
+
+on:
+  schedule:
+    - cron: '0 1,9,17 * * *'  # UTC时间 1:00, 9:00, 17:00 (北京时间 9:00, 17:00, 1:00)
+  
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '运行模式'
+        required: true
+        default: 'normal'
+        type: choice
+        options:
+          - normal
+          - test
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: 创建必要目录
+        run: |
+          mkdir -p data logs
+      
+      - name: 执行监控任务
+        env:
+          IEEE_EMAIL: ${{ secrets.IEEE_EMAIL }}
+          IEEE_PASSWORD: ${{ secrets.IEEE_PASSWORD }}
+          ELSEVIER_EMAIL: ${{ secrets.ELSEVIER_EMAIL }}
+          ELSEVIER_PASSWORD: ${{ secrets.ELSEVIER_PASSWORD }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          LOG_LEVEL: INFO
+          DATA_FILE: data/manuscripts.json
+          HEADLESS: true
+        run: |
+          MODE="${{ github.event.inputs.mode || 'normal' }}"
+          
+          echo "=========================================="
+          echo "运行模式: $MODE"
+          echo "时间: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
+          echo "=========================================="
+          
+          if [ "$MODE" = "test" ]; then
+            echo "🧪 测试模式：发送测试邮件"
+            python -c "from notification import EmailNotifier; EmailNotifier().send_test_email()"
+          else
+            echo "🚀 正常模式：执行监控任务"
+            python monitor.py
+          fi
+      
+      - name: 提交数据文件变化
+        if: always()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/manuscripts.json || true
+          if git diff --staged --quiet; then
+            echo "ℹ️  数据文件无变化"
+          else
+            git commit -m "Update manuscript status data [skip ci]"
+            git push
+            echo "✅ 数据文件已更新"
+          fi
