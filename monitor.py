@@ -221,9 +221,54 @@ class JournalMonitor:
                                 continue
                             
                             # 根据截图，列顺序是：STATUS(0), ID(1), TITLE(2), CREATED(3), SUBMITTED(4)
-                            status = cells[0].text.strip() if len(cells) > 0 else "未知状态"
-                            manuscript_id = cells[1].text.strip() if len(cells) > 1 else ""
-                            title = cells[2].text.strip() if len(cells) > 2 else ""
+                            # STATUS列可能包含多个元素，需要提取最后的状态信息
+                            status_cell = cells[0] if len(cells) > 0 else None
+                            status = "未知状态"
+                            if status_cell:
+                                # 尝试查找状态按钮或链接
+                                status_elements = status_cell.find_elements(By.XPATH, ".//a | .//button | .//span")
+                                if status_elements:
+                                    # 获取最后一个元素的文本（通常是状态）
+                                    for elem in status_elements:
+                                        elem_text = elem.text.strip()
+                                        if elem_text and elem_text not in ['Contact Journal', 'EIC:', 'ADM:']:
+                                            status = elem_text
+                                else:
+                                    status = status_cell.text.strip()
+                                    # 如果包含多行，取最后一行
+                                    if '\n' in status:
+                                        lines = [l.strip() for l in status.split('\n') if l.strip()]
+                                        status = lines[-1] if lines else "未知状态"
+                            
+                            # ID列
+                            manuscript_id = ""
+                            if len(cells) > 1:
+                                id_cell = cells[1]
+                                # 尝试查找id_cell中的所有文本
+                                manuscript_id = id_cell.text.strip()
+                                # 如果为空，尝试查找子元素
+                                if not manuscript_id:
+                                    id_elements = id_cell.find_elements(By.XPATH, ".//*")
+                                    for elem in id_elements:
+                                        elem_text = elem.text.strip()
+                                        if elem_text:
+                                            manuscript_id = elem_text
+                                            break
+                            
+                            # TITLE列
+                            title = ""
+                            if len(cells) > 2:
+                                title_cell = cells[2]
+                                # 尝试查找title_cell中的所有文本
+                                title = title_cell.text.strip()
+                                # 如果为空，尝试查找链接或其他元素
+                                if not title:
+                                    title_elements = title_cell.find_elements(By.XPATH, ".//a | .//span | .//div")
+                                    for elem in title_elements:
+                                        elem_text = elem.text.strip()
+                                        if elem_text and len(elem_text) > 5:  # 过滤掉太短的文本
+                                            title = elem_text
+                                            break
                             
                             print(f"    原始数据: STATUS=[{status}], ID=[{manuscript_id}], TITLE=[{title[:50] if title else ''}]")
                             
