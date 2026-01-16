@@ -1,7 +1,6 @@
 name: 期刊状态监控
 
 on:
- on:
   schedule:
     # 北京时间 9:00 - 每日报告（UTC 1:00）
     - cron: '0 1 * * *'
@@ -65,12 +64,15 @@ jobs:
           HEADLESS: true
         run: |
           MODE="${{ github.event.inputs.mode || 'normal' }}"
-          CURRENT_HOUR=$(TZ='Asia/Shanghai' date '+%H')
+          
+          # 使用UTC时间判断，更可靠
+          CURRENT_UTC_HOUR=$(date -u '+%H')
           
           echo "=========================================="
           echo "运行模式: $MODE"
-          echo "时间: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
-          echo "当前小时: $CURRENT_HOUR"
+          echo "UTC时间: $(date -u '+%Y-%m-%d %H:%M:%S')"
+          echo "北京时间: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
+          echo "当前UTC小时: $CURRENT_UTC_HOUR"
           echo "=========================================="
           
           if [ "$MODE" = "test" ]; then
@@ -82,8 +84,8 @@ jobs:
             python monitor.py
           else
             echo "🚀 正常模式：执行监控任务"
-            # 判断是否为北京时间9:00（每日报告时间）
-            if [ "$CURRENT_HOUR" = "09" ]; then
+            # UTC 1:00 = 北京时间 9:00（每日报告时间）
+            if [ "$CURRENT_UTC_HOUR" = "01" ]; then
               echo "📊 每日报告时间：发送所有稿件状态"
               export DAILY_REPORT=true
             else
