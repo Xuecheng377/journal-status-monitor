@@ -14,13 +14,13 @@
 - 支持 Elsevier Editorial Manager 基础登录和表格解析
 - 自动识别 ScholarOne `STATUS` 栏中最上方的当前状态
 - 能处理同一篇稿件被页面拆成多条状态历史的情况
-- 能按规范化论文题目合并重复记录，避免旧状态重复出现在日报中
+- 能按规范化论文题目合并重复记录，避免旧状态重复出现在周报中
 - 能识别并归档终态稿件，例如 `Accept`、`Accepted`、`Published`、`Rejected`、`Withdrawn`
 - 中文 HTML 邮件通知，论文题目、稿件 ID、原始投稿状态保持英文原文
-- 支持状态变化通知和每日状态报告
-- 每日状态报告当天只发送一次，多次兜底触发不会重复发
+- 支持状态变化通知和每周一状态报告
+- 每周一状态报告当天只发送一次，多次兜底触发不会重复发
 - 状态数据保存到 `data/manuscripts.json`
-- 日报发送记录保存到 `data/manuscripts.meta.json`
+- 周报发送记录保存到 `data/manuscripts.meta.json`
 - 解析失败时可上传调试截图和 HTML
 
 ## 工作流程
@@ -30,7 +30,7 @@
 3. 程序登录已配置的投稿系统。
 4. 程序读取稿件信息并和历史记录比较。
 5. 如果状态变化，发送中文状态变化通知。
-6. 如果是每日状态报告时段，发送当天活跃稿件报告。
+6. 如果是每周一状态报告时段，发送当前活跃稿件报告。
 7. 如果稿件进入终态，自动归档，后续不再作为活跃稿件持续提醒。
 
 ## 当前触发时间
@@ -39,21 +39,16 @@ Cloudflare Worker 使用“主触发 + 兜底唤醒”的时间窗口。每个�
 
 | 北京时间 | 模式 | 说明 |
 | --- | --- | --- |
-| 08:17 | `daily_report` | 主触发，每日报告当天只会发送一次 |
-| 08:27、08:37 | `daily_report` | 兜底唤醒；如果 08:17 已触发则跳过 |
+| 每周一 08:17 | `daily_report` | 主触发，每周状态报告当天只会发送一次 |
+| 每周一 08:27、08:37 | `daily_report` | 兜底唤醒；如果 08:17 已触发则跳过 |
 | 11:17 / 12:17 / 14:17 / 17:17 / 20:17 / 22:17 | `normal` | 主触发，状态变化才发邮件 |
 | 对应的 27、37 分 | `normal` | 兜底唤醒；同一小时窗口已触发则跳过 |
 
 对应 UTC cron：
 
 ```yaml
-- cron: '17,27,37 0 * * *'
-- cron: '17,27,37 3 * * *'
-- cron: '17,27,37 4 * * *'
-- cron: '17,27,37 6 * * *'
-- cron: '17,27,37 9 * * *'
-- cron: '17,27,37 12 * * *'
-- cron: '17,27,37 14 * * *'
+- cron: '17,27,37 0 * * 1'  # 北京时间每周一 08:17/08:27/08:37，周报
+- cron: '17,27,37 3,4,6,9,12,14 * * *'  # 北京时间 11/12/14/17/20/22，普通监测
 ```
 
 GitHub Actions 的 `schedule` 可能延迟或丢触发，因此当前项目不再依赖 GitHub schedule。Cloudflare Worker 会调用 GitHub `workflow_dispatch`，GitHub Actions 页面中的事件来源会显示为 `workflow_dispatch`。
@@ -140,7 +135,7 @@ journal-status-monitor-scheduler
 | --- | --- |
 | `test` | 只发送测试邮件，用于确认邮箱配置 |
 | `normal` | 正常监控，只有状态变化时发邮件 |
-| `daily_report` | 发送当前活跃稿件每日状态报告 |
+| `daily_report` | 发送当前活跃稿件每周一状态报告 |
 
 手动运行：
 
@@ -171,24 +166,24 @@ python monitor.py --mode test
 python monitor.py --mode normal
 ```
 
-每日状态报告：
+每周一状态报告：
 
 ```bash
 python monitor.py --mode daily_report
 ```
 
-## 终态归档和日报防重复
+## 终态归档和周报防重复
 
-默认情况下，稿件达到终态后会自动归档。归档稿件仍保存在 `data/manuscripts.json`，但不会继续出现在活跃稿件日报中。
+默认情况下，稿件达到终态后会自动归档。归档稿件仍保存在 `data/manuscripts.json`，但不会继续出现在活跃稿件周报中。
 
-每日状态报告发送成功后，会在 `data/manuscripts.meta.json` 记录当天已发送。当天后续兜底触发会跳过日报，避免重复发送。
+每周一状态报告发送成功后，会在 `data/manuscripts.meta.json` 记录当天已发送。当天后续兜底触发会跳过周报，避免重复发送。
 
 相关环境变量：
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `ARCHIVE_TERMINAL` | `true` | 是否自动归档终态稿件 |
-| `INCLUDE_ARCHIVED_IN_REPORT` | `false` | 每日报告是否包含已归档稿件 |
+| `INCLUDE_ARCHIVED_IN_REPORT` | `false` | 周报是否包含已归档稿件 |
 | `TERMINAL_STATUS_KEYWORDS` | 内置列表 | 自定义终态关键词，英文逗号分隔 |
 
 ## 数据和隐私
@@ -215,9 +210,9 @@ GitHub Actions 的 `schedule` 不保证准点，可能延迟，也可能在高�
 
 这是正常行为。它们是兜底唤醒点：如果同一检查窗口已经由 17 分触发过，Worker 会跳过，不再创建新的 GitHub Actions 运行。
 
-### 为什么稿件接收后不再出现在日报？
+### 为什么稿件接收后不再出现在周报？
 
-`Accept` 属于终态。程序会自动归档终态稿件，默认不再把它列入活跃稿件日报。
+`Accept` 属于终态。程序会自动归档终态稿件，默认不再把它列入活跃稿件周报。
 
 ### 稿件状态识别不正确怎么办？
 
@@ -233,7 +228,7 @@ GitHub Actions 的 `schedule` 不保证准点，可能延迟，也可能在高�
 | --- | --- |
 | `monitor.py` | 登录投稿系统、抓取和解析稿件状态 |
 | `notification.py` | 生成并发送中文邮件 |
-| `storage.py` | 保存状态、比较变化、归档和日报防重复 |
+| `storage.py` | 保存状态、比较变化、归档和周报防重复 |
 | `config.py` | 读取配置和环境变量 |
 | `.github/workflows/monitor.yml` | GitHub Actions 工作流 |
 | `cloudflare-scheduler/` | Cloudflare 外部定时器 |
