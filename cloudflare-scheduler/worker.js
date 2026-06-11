@@ -4,6 +4,7 @@ const DEFAULT_WORKFLOW = "monitor.yml";
 const DEFAULT_REF = "main";
 
 const DAILY_REPORT_HOUR = 8;
+const WEEKLY_REPORT_DAY = 1;
 const NORMAL_HOURS = new Set([11, 12, 14, 17, 20, 22]);
 const FALLBACK_MINUTES = new Set([17, 27, 37]);
 const LOOKBACK_MINUTES = 45;
@@ -23,13 +24,14 @@ function formatBeijingTime(date = new Date()) {
 
 function resolveMode(date = new Date()) {
   const bj = beijingTime(date);
+  const day = bj.getUTCDay();
   const hour = bj.getUTCHours();
   const minute = bj.getUTCMinutes();
 
   if (!FALLBACK_MINUTES.has(minute)) {
     return null;
   }
-  if (hour === DAILY_REPORT_HOUR) {
+  if (day === WEEKLY_REPORT_DAY && hour === DAILY_REPORT_HOUR) {
     return "daily_report";
   }
   if (NORMAL_HOURS.has(hour)) {
