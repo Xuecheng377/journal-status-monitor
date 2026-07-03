@@ -70,6 +70,20 @@ function assertLocalRequest(req) {
   }
 }
 
+function userFacingError(error) {
+  const message = error?.message || String(error);
+  if (message === "Bad credentials") {
+    return "GitHub Token 无效或已过期，请重新生成 token。";
+  }
+  if (message.includes("Resource not accessible by personal access token")) {
+    return "GitHub Token 缺少权限，至少需要 Secrets: Read and write，并授权到当前仓库。";
+  }
+  if (message.includes("incomplete input")) {
+    return "GitHub Secrets 公钥解析失败。请确认 GitHub Token 有 Secrets 读写权限，然后重启本地配置后台后再保存。";
+  }
+  return message;
+}
+
 async function serveStatic(req, res) {
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
   const target = url.pathname === "/" ? "index.html" : url.pathname.replace(/^\/+/, "");
@@ -248,7 +262,7 @@ async function route(req, res) {
   } catch (error) {
     jsonResponse(res, 500, {
       ok: false,
-      errors: [error.message || String(error)],
+      errors: [userFacingError(error)],
     });
   }
 }
