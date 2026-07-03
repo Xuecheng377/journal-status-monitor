@@ -175,8 +175,11 @@ http://127.0.0.1:8976
 
 - “已有旧配置”对应 `IEEE_EMAIL` / `ELSEVIER_EMAIL` 这一组最早的 Secret，留空会保持不变。
 - “新增投稿账号”会写入 `IEEE_2_*`、`IEEE_3_*` 或 `ELSEVIER_2_*`、`ELSEVIER_3_*` 这样的新槽位，不会替换已有账号。
+- “账号管理”可以查看已配置槽位、修改指定槽位，或删除某个槽位对应的 `EMAIL`、`PASSWORD`、`URL` 三个 Secret。
 
 页面会自动读取本地 `cloudflare-scheduler/wrangler.toml` 并预填当前检查时间。GitHub Secrets 不能读回明文，但填写 GitHub token 后可以检查哪些 Secret 已存在；已存在的密码或授权码输入框可以留空，保存时会保持旧 Secret 不变。
+
+旧 Secret 的邮箱、网址、密码都不能从 GitHub 读回明文。通过本地后台保存或修改过的投稿账号，会把邮箱和网址作为非敏感元数据保存在本机 `local-config-ui/data/`，用于页面查看；密码不会保存到本地。
 
 ## 运行模式
 
