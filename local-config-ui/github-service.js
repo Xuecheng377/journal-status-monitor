@@ -76,6 +76,18 @@ async function putRepoSecret({ owner, repo, token, name, value, fetchImpl = fetc
   return { name, status: "updated" };
 }
 
+async function deleteRepoSecret({ owner, repo, token, name, fetchImpl = fetch, ignoreNotFound = true }) {
+  const response = await fetchImpl(`${repoApiBase(owner, repo)}/actions/secrets/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+    headers: githubHeaders(token),
+  });
+  if (response.status === 204 || (ignoreNotFound && response.status === 404)) {
+    return { name, status: response.status === 404 ? "missing" : "deleted" };
+  }
+  await readJsonResponse(response, `Could not delete secret ${name}.`);
+  return { name, status: "deleted" };
+}
+
 async function listRepoSecrets({ owner, repo, token, fetchImpl = fetch }) {
   const response = await fetchImpl(`${repoApiBase(owner, repo)}/actions/secrets?per_page=100`, {
     headers: githubHeaders(token),
@@ -104,6 +116,7 @@ async function dispatchWorkflow({ owner, repo, token, workflow = "monitor.yml", 
 }
 
 module.exports = {
+  deleteRepoSecret,
   dispatchWorkflow,
   encryptSecret,
   getRepoPublicKey,
