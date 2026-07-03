@@ -32,3 +32,35 @@ test("encrypts GitHub secret using provided sodium-like implementation", async (
   const encrypted = await encryptSecret("secret-value", Buffer.from("public-key").toString("base64"), fakeSodium);
   assert.equal(Buffer.from(encrypted, "base64").toString("utf8"), "sealed:public-key:secret-value");
 });
+
+test("retries GitHub public key decoding with no-padding base64 variant", async () => {
+  const calls = [];
+  const fakeSodium = {
+    ready: Promise.resolve(),
+    base64_variants: {
+      ORIGINAL: "original",
+      ORIGINAL_NO_PADDING: "original_no_padding",
+    },
+    from_base64(value, variant) {
+      calls.push(variant);
+      if (variant !== "original_no_padding") {
+        throw new Error("incomplete input");
+      }
+      return Buffer.from(value, "base64");
+    },
+    from_string(value) {
+      return Buffer.from(value, "utf8");
+    },
+    crypto_box_seal(message, key) {
+      return Buffer.concat([Buffer.from("sealed:"), key, Buffer.from(":"), message]);
+    },
+    to_base64(value) {
+      return Buffer.from(value).toString("base64");
+    },
+  };
+
+  const encrypted = await encryptSecret("secret-value", Buffer.from("public-key").toString("base64").replace(/=+$/, ""), fakeSodium);
+
+  assert.deepEqual(calls, [undefined, "original_no_padding"]);
+  assert.equal(Buffer.from(encrypted, "base64").toString("utf8"), "sealed:public-key:secret-value");
+});
