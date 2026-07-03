@@ -3,6 +3,7 @@ const DEFAULT_REPO = "journal-status-monitor";
 const DEFAULT_WORKFLOW = "monitor.yml";
 const DEFAULT_REF = "main";
 const FALLBACK_MINUTES = [17, 27, 37];
+const KEEP_EXISTING_SECRET = "__KEEP_EXISTING_SECRET__";
 
 const SECRET_FIELDS = [
   "IEEE_EMAIL",
@@ -45,6 +46,11 @@ function assertMinute(minute, label) {
 function beijingHourToUtcHour(hour) {
   assertHour(hour, "Beijing hour");
   return (hour + 16) % 24;
+}
+
+function utcHourToBeijingHour(hour) {
+  assertHour(hour, "UTC hour");
+  return (hour + 8) % 24;
 }
 
 function fallbackMinuteList(primaryMinute) {
@@ -127,15 +133,29 @@ function buildSecrets(settings) {
   );
 }
 
+function mergeExistingSecretValues(settings, existingSecrets = {}) {
+  const secrets = buildSecrets(settings);
+  for (const name of SECRET_FIELDS) {
+    if (!secrets[name] && existingSecrets[name]) {
+      secrets[name] = KEEP_EXISTING_SECRET;
+    }
+  }
+  return secrets;
+}
+
 function buildEnvPreview(settings) {
   return Object.entries(buildSecrets(settings))
     .map(([name, value]) => `${name}=${value}`)
     .join("\n");
 }
 
-function validateSettings(settings) {
+function activeSecrets(settings, existingSecrets = {}) {
+  return mergeExistingSecretValues(settings, existingSecrets);
+}
+
+function validateSettings(settings, options = {}) {
   const errors = [];
-  const secrets = buildSecrets(settings);
+  const secrets = activeSecrets(settings, options.existingSecrets || {});
   const ieeeNames = ["IEEE_EMAIL", "IEEE_PASSWORD", "IEEE_URL"];
   const elsevierNames = ["ELSEVIER_EMAIL", "ELSEVIER_PASSWORD", "ELSEVIER_URL"];
   const ieeeAny = ieeeNames.some((name) => secrets[name]);
@@ -167,16 +187,68 @@ function validateSettings(settings) {
   return errors;
 }
 
+function parseVars(toml) {
+  const vars = {};
+  for (const match of toml.matchAll(/^(GITHUB_OWNER|GITHUB_REPO|GITHUB_WORKFLOW|GITHUB_REF)\s*=\s*"([^"]*)"/gm)) {
+    vars[match[1]] = match[2];
+  }
+  return vars;
+}
+
+function firstNumberListPart(value) {
+  return value
+    .split(",")
+    .map((item) => Number.parseInt(item, 10))
+    .filter((number) => Number.isInteger(number));
+}
+
+function parseWranglerToml(toml) {
+  const vars = parseVars(toml || "");
+  const crons = Array.from((toml || "").matchAll(/"([^"]+\s+\S+\s+\*\s+\*\s+\S+)"/g)).map((match) => match[1]);
+  const reportCron = crons.find((cron) => !cron.endsWith("*")) || "17,27,37 0 * * 1";
+  const normalCron = crons.find((cron) => cron.endsWith("*")) || "17,27,37 3,4,6,9,12,14 * * *";
+  const reportParts = reportCron.split(/\s+/);
+  const normalParts = normalCron.split(/\s+/);
+  const reportMinute = firstNumberListPart(reportParts[0])[0] || 17;
+  const reportHour = utcHourToBeijingHour(Number.parseInt(reportParts[1], 10));
+  const reportDay = Number.parseInt(reportParts[4], 10);
+  const normalMinute = firstNumberListPart(normalParts[0])[0] || 17;
+  const normalHours = firstNumberListPart(normalParts[1]).map(utcHourToBeijingHour).sort((a, b) => a - b);
+
+  return {
+    repository: {
+      owner: vars.GITHUB_OWNER || DEFAULT_OWNER,
+      name: vars.GITHUB_REPO || DEFAULT_REPO,
+      workflow: vars.GITHUB_WORKFLOW || DEFAULT_WORKFLOW,
+      ref: vars.GITHUB_REF || DEFAULT_REF,
+    },
+    schedule: {
+      weeklyReport: {
+        dayOfWeek: Number.isInteger(reportDay) ? reportDay : 1,
+        hour: reportHour,
+        minute: reportMinute,
+      },
+      normalChecks: {
+        hours: normalHours.length ? normalHours : [11, 12, 14, 17, 20, 22],
+        minute: normalMinute,
+      },
+    },
+  };
+}
+
 module.exports = {
   DEFAULT_OWNER,
   DEFAULT_REPO,
   DEFAULT_WORKFLOW,
   DEFAULT_REF,
+  KEEP_EXISTING_SECRET,
   SECRET_FIELDS,
   beijingHourToUtcHour,
   buildCronExpressions,
   buildEnvPreview,
   buildSecrets,
   buildWranglerToml,
+  mergeExistingSecretValues,
+  parseWranglerToml,
   validateSettings,
 };
