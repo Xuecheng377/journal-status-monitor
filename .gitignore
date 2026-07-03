@@ -23,28 +23,32 @@ wheels/
 .installed.cfg
 *.egg
 
-# 环境变量
+# Environment variables and local secrets
 .env
+*.local
 
-# 数据文件
+# Data and logs
 data/
-*.json
-
-# 日志
 logs/
 *.log
 
-# IDE
+# Node
+node_modules/
+
+# Local brainstorming / scratch files
+.superpowers/
+config-ui-concept.html
+verify/
+
+# IDE and OS
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# 操作系统
 .DS_Store
 Thumbs.db
 
-# 浏览器驱动
+# Browser drivers
 chromedriver
 geckodriver
