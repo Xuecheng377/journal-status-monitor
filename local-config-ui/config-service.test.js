@@ -4,6 +4,7 @@ const {
   beijingHourToUtcHour,
   buildCronExpressions,
   buildSecrets,
+  KEEP_EXISTING_SECRET,
   mergeExistingSecretValues,
   parseWranglerToml,
   buildWranglerToml,
@@ -97,6 +98,56 @@ test("keeps existing secret values when form field is blank", () => {
   assert.equal(merged.IEEE_PASSWORD, "__KEEP_EXISTING_SECRET__");
   assert.equal(merged.EMAIL_PASSWORD, "__KEEP_EXISTING_SECRET__");
   assert.equal(Object.hasOwn(merged, "IEEE_EMAIL"), true);
+});
+
+test("adds a new platform account to the next empty slot without replacing existing account secrets", () => {
+  const settings = completeSettings();
+  delete settings.platforms;
+  settings.platformAccounts = {
+    additions: [
+      {
+        platform: "ieee",
+        email: "second-author@example.com",
+        password: "second-password",
+        url: "https://mc.manuscriptcentral.com/second",
+      },
+    ],
+  };
+
+  const merged = mergeExistingSecretValues(settings, {
+    IEEE_EMAIL: true,
+    IEEE_PASSWORD: true,
+    IEEE_URL: true,
+  });
+
+  assert.equal(merged.IEEE_EMAIL, KEEP_EXISTING_SECRET);
+  assert.equal(merged.IEEE_PASSWORD, KEEP_EXISTING_SECRET);
+  assert.equal(merged.IEEE_URL, KEEP_EXISTING_SECRET);
+  assert.equal(merged.IEEE_2_EMAIL, "second-author@example.com");
+  assert.equal(merged.IEEE_2_PASSWORD, "second-password");
+  assert.equal(merged.IEEE_2_URL, "https://mc.manuscriptcentral.com/second");
+});
+
+test("new platform accounts start from slot 2 even when existing secrets were not checked", () => {
+  const settings = completeSettings();
+  delete settings.platforms;
+  settings.platformAccounts = {
+    additions: [
+      {
+        platform: "ieee",
+        email: "new-author@example.com",
+        password: "new-password",
+        url: "https://mc.manuscriptcentral.com/new",
+      },
+    ],
+  };
+
+  const secrets = buildSecrets(settings);
+
+  assert.equal(Object.hasOwn(secrets, "IEEE_EMAIL"), false);
+  assert.equal(secrets.IEEE_2_EMAIL, "new-author@example.com");
+  assert.equal(secrets.IEEE_2_PASSWORD, "new-password");
+  assert.equal(secrets.IEEE_2_URL, "https://mc.manuscriptcentral.com/new");
 });
 
 test("validates blank secret fields when an existing secret is present", () => {
