@@ -105,7 +105,7 @@ async function handlePreview(req, res) {
       .filter((name) => mergedSecrets[name] === KEEP_EXISTING_SECRET)
       .sort(),
     wranglerToml: buildWranglerToml(settings),
-    envPreview: buildEnvPreview(settings),
+    envPreview: buildEnvPreview(settings, existingSecrets),
   });
 }
 
@@ -145,18 +145,24 @@ async function handleSave(req, res) {
   const settings = body.settings || {};
   const tokens = body.tokens || {};
   const actions = body.actions || {};
-  const existingSecrets = body.existingSecrets || {};
-  const errors = validateSettings(settings, { existingSecrets });
-  if (errors.length) {
-    jsonResponse(res, 400, { ok: false, errors });
-    return;
-  }
   if (!tokens.githubToken?.trim()) {
     jsonResponse(res, 400, { ok: false, errors: ["GitHub token 必填，用于写入 GitHub Secrets。"] });
     return;
   }
 
   const repo = repoFromSettings(settings);
+  const liveExistingSecrets = await listRepoSecrets({
+    owner: repo.owner,
+    repo: repo.repo,
+    token: tokens.githubToken.trim(),
+  });
+  const existingSecrets = { ...(body.existingSecrets || {}), ...liveExistingSecrets };
+  const errors = validateSettings(settings, { existingSecrets });
+  if (errors.length) {
+    jsonResponse(res, 400, { ok: false, errors });
+    return;
+  }
+
   const secrets = mergeExistingSecretValues(settings, existingSecrets);
   const updatedSecrets = [];
   const keptSecrets = [];
