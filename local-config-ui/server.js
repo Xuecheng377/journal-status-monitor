@@ -15,9 +15,12 @@ const {
   parseWranglerToml,
   buildSecrets,
   buildWranglerToml,
+  listPlatformAccounts,
   validateSettings,
+  platformSecretNames,
+  platformSlotLabel,
 } = require("./config-service");
-const { dispatchWorkflow, listRepoSecrets, putRepoSecret } = require("./github-service");
+const { deleteRepoSecret, dispatchWorkflow, listRepoSecrets, putRepoSecret } = require("./github-service");
 
 const execFile = promisify(childProcess.execFile);
 const HOST = "127.0.0.1";
@@ -27,6 +30,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const WRANGLER_PATH = path.join(ROOT_DIR, "cloudflare-scheduler", "wrangler.toml");
 const LOCAL_DATA_DIR = path.join(__dirname, "data");
 const SLOT_ASSIGNMENTS_PATH = path.join(LOCAL_DATA_DIR, "platform-slot-assignments.json");
+const PLATFORM_METADATA_PATH = path.join(LOCAL_DATA_DIR, "platform-metadata.json");
 
 function jsonResponse(res, statusCode, payload) {
   const body = JSON.stringify(payload);
@@ -68,6 +72,67 @@ async function readSlotAssignments() {
 async function writeSlotAssignments(assignments) {
   await fs.mkdir(LOCAL_DATA_DIR, { recursive: true });
   await fs.writeFile(SLOT_ASSIGNMENTS_PATH, JSON.stringify(assignments, null, 2), "utf8");
+}
+
+async function readPlatformMetadata() {
+  try {
+    return JSON.parse(await fs.readFile(PLATFORM_METADATA_PATH, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+async function writePlatformMetadata(metadata) {
+  await fs.mkdir(LOCAL_DATA_DIR, { recursive: true });
+  await fs.writeFile(PLATFORM_METADATA_PATH, JSON.stringify(metadata, null, 2), "utf8");
+}
+
+function collectMetadataFromSettings(settings) {
+  const updates = {};
+  const platforms = settings?.platforms || {};
+  for (const [platform, account] of Object.entries(platforms)) {
+    if (!account) {
+      continue;
+    }
+    const label = platformSlotLabel(platform, 1);
+    updates[label] = {
+      platform,
+      slot: 1,
+      email: account.email || "",
+      url: account.url || "",
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  const additions = Array.isArray(settings?.platformAccounts?.additions) ? settings.platformAccounts.additions : [];
+  for (const account of additions) {
+    if (!Number.isInteger(account.slot)) {
+      continue;
+    }
+    const label = platformSlotLabel(account.platform, account.slot);
+    updates[label] = {
+      platform: account.platform,
+      slot: account.slot,
+      email: account.email || "",
+      url: account.url || "",
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  return updates;
+}
+
+function stripDeletedAssignments(assignments, label) {
+  return Object.fromEntries(
+    Object.entries(assignments || {}).filter(([, value]) => {
+      if (!value || !Number.isInteger(value.slot)) {
+        return true;
+      }
+      try {
+        return platformSlotLabel(value.platform, value.slot) !== label;
+      } catch {
+        return true;
+      }
+    }),
+  );
 }
 
 function repoFromSettings(settings) {
@@ -152,6 +217,7 @@ async function handleCurrent(req, res) {
   }
 
   let existingSecrets = {};
+  let accounts = [];
   if (token) {
     const repo = {
       owner: body.repository?.owner?.trim() || parsed.repository?.owner || DEFAULT_OWNER,
@@ -162,6 +228,7 @@ async function handleCurrent(req, res) {
       repo: repo.repo,
       token,
     });
+    accounts = listPlatformAccounts(existingSecrets, await readPlatformMetadata());
   }
 
   jsonResponse(res, 200, {
@@ -169,6 +236,27 @@ async function handleCurrent(req, res) {
     repository: parsed.repository,
     schedule: parsed.schedule,
     existingSecrets,
+    accounts,
+  });
+}
+
+async function handleAccounts(req, res) {
+  const body = await readJson(req);
+  const token = body.githubToken?.trim();
+  if (!token) {
+    jsonResponse(res, 400, { ok: false, errors: ["GitHub token 必填，用于读取账号配置状态。"] });
+    return;
+  }
+  const parsed = parseWranglerToml(await fs.readFile(WRANGLER_PATH, "utf8").catch(() => ""));
+  const repo = {
+    owner: body.repository?.owner?.trim() || parsed.repository?.owner || DEFAULT_OWNER,
+    repo: body.repository?.name?.trim() || parsed.repository?.name || DEFAULT_REPO,
+  };
+  const existingSecrets = await listRepoSecrets({ owner: repo.owner, repo: repo.repo, token });
+  jsonResponse(res, 200, {
+    ok: true,
+    existingSecrets,
+    accounts: listPlatformAccounts(existingSecrets, await readPlatformMetadata()),
   });
 }
 
@@ -199,6 +287,7 @@ async function handleSave(req, res) {
   }
 
   const secrets = mergeExistingSecretValues(settingsWithSlots, existingSecrets);
+  await writeSlotAssignments(slotState.assignments);
   const updatedSecrets = [];
   const keptSecrets = [];
   for (const [name, value] of Object.entries(secrets)) {
@@ -217,7 +306,10 @@ async function handleSave(req, res) {
   }
 
   await fs.writeFile(WRANGLER_PATH, buildWranglerToml(settingsWithSlots), "utf8");
-  await writeSlotAssignments(slotState.assignments);
+  await writePlatformMetadata({
+    ...(await readPlatformMetadata()),
+    ...collectMetadataFromSettings(settingsWithSlots),
+  });
 
   let deployResult = null;
   if (actions.deployCloudflare) {
@@ -250,6 +342,48 @@ async function handleSave(req, res) {
   });
 }
 
+async function handleDeleteAccount(req, res) {
+  const body = await readJson(req);
+  const token = body.githubToken?.trim();
+  if (!token) {
+    jsonResponse(res, 400, { ok: false, errors: ["GitHub token 必填，用于删除 GitHub Secrets。"] });
+    return;
+  }
+  const platform = body.account?.platform;
+  const slot = Number.parseInt(body.account?.slot, 10);
+  if (!Number.isInteger(slot)) {
+    jsonResponse(res, 400, { ok: false, errors: ["删除账号时缺少有效槽位。"] });
+    return;
+  }
+  const repo = {
+    owner: body.repository?.owner?.trim() || DEFAULT_OWNER,
+    repo: body.repository?.name?.trim() || DEFAULT_REPO,
+  };
+  const names = platformSecretNames(platform, slot);
+  const deletedSecrets = [];
+  for (const name of [names.email, names.password, names.url]) {
+    const result = await deleteRepoSecret({
+      owner: repo.owner,
+      repo: repo.repo,
+      token,
+      name,
+    });
+    deletedSecrets.push(result.name);
+  }
+
+  const label = platformSlotLabel(platform, slot);
+  const metadata = await readPlatformMetadata();
+  delete metadata[label];
+  await writePlatformMetadata(metadata);
+  await writeSlotAssignments(stripDeletedAssignments(await readSlotAssignments(), label));
+
+  jsonResponse(res, 200, {
+    ok: true,
+    deletedSecrets,
+    label,
+  });
+}
+
 async function deployCloudflare(token) {
   const env = { ...process.env, CLOUDFLARE_API_TOKEN: token };
   const { stdout, stderr } = await execFile("npx", ["wrangler", "deploy"], {
@@ -276,8 +410,16 @@ async function route(req, res) {
       await handleCurrent(req, res);
       return;
     }
+    if (req.method === "POST" && req.url === "/api/accounts") {
+      await handleAccounts(req, res);
+      return;
+    }
     if (req.method === "POST" && req.url === "/api/save") {
       await handleSave(req, res);
+      return;
+    }
+    if (req.method === "POST" && req.url === "/api/delete-account") {
+      await handleDeleteAccount(req, res);
       return;
     }
     textResponse(res, 404, "Not found");
