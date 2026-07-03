@@ -12,6 +12,7 @@
 
 - 支持 IEEE ScholarOne / Manuscript Central 投稿系统
 - 支持 Elsevier Editorial Manager 基础登录和表格解析
+- 支持同一平台配置多组投稿账号，新增账号不会覆盖旧账号
 - 自动识别 ScholarOne `STATUS` 栏中最上方的当前状态
 - 能处理同一篇稿件被页面拆成多条状态历史的情况
 - 能按规范化论文题目合并重复记录，避免旧状态重复出现在周报中
@@ -69,6 +70,15 @@ GitHub Actions 的 `schedule` 可能延迟或丢触发，因此当前项目不�
 | `IEEE_PASSWORD` | IEEE ScholarOne 登录密码 |
 | `IEEE_URL` | 期刊对应的 ScholarOne 投稿系统地址 |
 
+如果需要新增第二、第三组 IEEE 账号，使用：
+
+| Secret | 说明 |
+| --- | --- |
+| `IEEE_2_EMAIL` / `IEEE_2_PASSWORD` / `IEEE_2_URL` | 第二组 IEEE ScholarOne 账号 |
+| `IEEE_3_EMAIL` / `IEEE_3_PASSWORD` / `IEEE_3_URL` | 第三组 IEEE ScholarOne 账号 |
+| `IEEE_4_EMAIL` / `IEEE_4_PASSWORD` / `IEEE_4_URL` | 第四组 IEEE ScholarOne 账号 |
+| `IEEE_5_EMAIL` / `IEEE_5_PASSWORD` / `IEEE_5_URL` | 第五组 IEEE ScholarOne 账号 |
+
 ### Elsevier Editorial Manager
 
 | Secret | 说明 |
@@ -76,6 +86,15 @@ GitHub Actions 的 `schedule` 可能延迟或丢触发，因此当前项目不�
 | `ELSEVIER_EMAIL` | Elsevier / Editorial Manager 登录邮箱 |
 | `ELSEVIER_PASSWORD` | Elsevier / Editorial Manager 登录密码 |
 | `ELSEVIER_URL` | 期刊对应的 Editorial Manager 地址 |
+
+如果需要新增第二、第三组 Elsevier 账号，使用：
+
+| Secret | 说明 |
+| --- | --- |
+| `ELSEVIER_2_EMAIL` / `ELSEVIER_2_PASSWORD` / `ELSEVIER_2_URL` | 第二组 Elsevier Editorial Manager 账号 |
+| `ELSEVIER_3_EMAIL` / `ELSEVIER_3_PASSWORD` / `ELSEVIER_3_URL` | 第三组 Elsevier Editorial Manager 账号 |
+| `ELSEVIER_4_EMAIL` / `ELSEVIER_4_PASSWORD` / `ELSEVIER_4_URL` | 第四组 Elsevier Editorial Manager 账号 |
+| `ELSEVIER_5_EMAIL` / `ELSEVIER_5_PASSWORD` / `ELSEVIER_5_URL` | 第五组 Elsevier Editorial Manager 账号 |
 
 ### 邮件通知
 
@@ -151,6 +170,11 @@ http://127.0.0.1:8976
 ```
 
 这个网页可以填写投稿平台、邮件通知、检查时间和归档规则。保存时，投稿系统密码和邮箱授权码会写入 GitHub Secrets，不会写入仓库明文文件。GitHub token 和 Cloudflare token 只用于当前请求，默认不保存到本地文件。
+
+页面分为“已有旧配置”和“新增投稿账号”两块：
+
+- “已有旧配置”对应 `IEEE_EMAIL` / `ELSEVIER_EMAIL` 这一组最早的 Secret，留空会保持不变。
+- “新增投稿账号”会写入 `IEEE_2_*`、`IEEE_3_*` 或 `ELSEVIER_2_*`、`ELSEVIER_3_*` 这样的新槽位，不会替换已有账号。
 
 页面会自动读取本地 `cloudflare-scheduler/wrangler.toml` 并预填当前检查时间。GitHub Secrets 不能读回明文，但填写 GitHub token 后可以检查哪些 Secret 已存在；已存在的密码或授权码输入框可以留空，保存时会保持旧 Secret 不变。
 
