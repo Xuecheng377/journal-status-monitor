@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
 let existingSecrets = {};
+let additionCount = 0;
 
 function intValue(id, fallback) {
   const value = Number.parseInt($(id).value, 10);
@@ -13,7 +14,33 @@ function hourList(id) {
     .filter((value) => Number.isInteger(value));
 }
 
+function platformSlotNames(platform, slot) {
+  const prefix = slot === 1 ? platform.toUpperCase() : `${platform.toUpperCase()}_${slot}`;
+  return [`${prefix}_EMAIL`, `${prefix}_PASSWORD`, `${prefix}_URL`];
+}
+
+function existingPlatformSlots(platform) {
+  const slots = [];
+  for (let slot = 1; slot <= 5; slot += 1) {
+    if (platformSlotNames(platform, slot).every((name) => existingSecrets[name])) {
+      slots.push(slot === 1 ? platform.toUpperCase() : `${platform.toUpperCase()}_${slot}`);
+    }
+  }
+  return slots;
+}
+
+function collectPlatformAdditions() {
+  return Array.from(document.querySelectorAll(".platform-addition")).map((card) => ({
+    platform: card.querySelector("[data-field='platform']").value,
+    url: card.querySelector("[data-field='url']").value,
+    email: card.querySelector("[data-field='email']").value,
+    password: card.querySelector("[data-field='password']").value,
+  }));
+}
+
 function collectSettings() {
+  const includeIeeeLegacy = $("enableIeeeOverwrite").checked;
+  const includeElsevierLegacy = $("enableElsevierOverwrite").checked;
   return {
     repository: {
       owner: "Xuecheng377",
@@ -22,16 +49,19 @@ function collectSettings() {
       ref: "main",
     },
     platforms: {
-      ieee: {
+      ieee: includeIeeeLegacy ? {
         url: $("ieeeUrl").value,
         email: $("ieeeEmail").value,
         password: $("ieeePassword").value,
-      },
-      elsevier: {
+      } : null,
+      elsevier: includeElsevierLegacy ? {
         url: $("elsevierUrl").value,
         email: $("elsevierEmail").value,
         password: $("elsevierPassword").value,
-      },
+      } : null,
+    },
+    platformAccounts: {
+      additions: collectPlatformAdditions(),
     },
     email: {
       sender: $("emailSender").value,
@@ -84,12 +114,43 @@ function applyCurrentConfig(data) {
 }
 
 function renderSecretStatus() {
-  const ieeeConfigured = ["IEEE_EMAIL", "IEEE_PASSWORD", "IEEE_URL"].every((name) => existingSecrets[name]);
-  const elsevierConfigured = ["ELSEVIER_EMAIL", "ELSEVIER_PASSWORD", "ELSEVIER_URL"].every((name) => existingSecrets[name]);
-  $("ieeeStatus").textContent = ieeeConfigured ? "GitHub Secrets 中已有 IEEE 配置，留空保持不变" : "未检测到完整 IEEE 旧配置";
-  $("elsevierStatus").textContent = elsevierConfigured ? "GitHub Secrets 中已有 Elsevier 配置，留空保持不变" : "未检测到完整 Elsevier 旧配置";
+  const ieeeSlots = existingPlatformSlots("ieee");
+  const elsevierSlots = existingPlatformSlots("elsevier");
+  const ieeeConfigured = ieeeSlots.length > 0;
+  const elsevierConfigured = elsevierSlots.length > 0;
+  $("ieeeStatus").textContent = ieeeConfigured ? `已存在：${ieeeSlots.join("、")}；留空保持不变` : "未检测到完整 IEEE 旧配置";
+  $("elsevierStatus").textContent = elsevierConfigured ? `已存在：${elsevierSlots.join("、")}；留空保持不变` : "未检测到完整 Elsevier 旧配置";
   $("ieeeStatus").classList.toggle("ok", ieeeConfigured);
   $("elsevierStatus").classList.toggle("ok", elsevierConfigured);
+}
+
+function addPlatformCard(initial = {}) {
+  additionCount += 1;
+  const card = document.createElement("div");
+  card.className = "card platform-addition";
+  card.dataset.index = String(additionCount);
+  card.innerHTML = `
+    <div class="card-title-row">
+      <h3>新增投稿账号 ${additionCount}</h3>
+      <button type="button" class="ghost remove-platform">移除</button>
+    </div>
+    <label>投稿平台
+      <select data-field="platform">
+        <option value="ieee">IEEE ScholarOne</option>
+        <option value="elsevier">Elsevier Editorial Manager</option>
+      </select>
+    </label>
+    <label>投稿系统网址<input data-field="url" placeholder="https://mc.manuscriptcentral.com/..."></label>
+    <label>登录邮箱 / 用户名<input data-field="email" autocomplete="username"></label>
+    <label>登录密码<input data-field="password" type="password" autocomplete="new-password"></label>
+    <p class="hint">这组会写入下一个空 Secret 槽位，例如 IEEE_2_EMAIL，不会覆盖 IEEE_EMAIL。</p>
+  `;
+  card.querySelector("[data-field='platform']").value = initial.platform || "ieee";
+  card.querySelector("[data-field='url']").value = initial.url || "";
+  card.querySelector("[data-field='email']").value = initial.email || "";
+  card.querySelector("[data-field='password']").value = initial.password || "";
+  card.querySelector(".remove-platform").addEventListener("click", () => card.remove());
+  $("platformAdditions").appendChild(card);
 }
 
 function collectActions() {
@@ -208,5 +269,6 @@ $("previewBtn").addEventListener("click", previewConfig);
 $("saveBtn").addEventListener("click", saveConfig);
 $("loadBtn").addEventListener("click", loadCurrentConfig);
 $("checkSecretsBtn").addEventListener("click", loadCurrentConfig);
+$("addPlatformBtn").addEventListener("click", () => addPlatformCard());
 
 loadCurrentConfig();
