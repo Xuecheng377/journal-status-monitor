@@ -129,6 +129,29 @@ wrangler deploy
 journal-status-monitor-scheduler
 ```
 
+## 本地可视化配置后台
+
+项目提供一个只在本机运行的配置网页，位置：
+
+```text
+local-config-ui/
+```
+
+启动：
+
+```powershell
+cd local-config-ui
+.\start.ps1
+```
+
+然后打开：
+
+```text
+http://127.0.0.1:8976
+```
+
+这个网页可以填写投稿平台、邮件通知、检查时间和归档规则。保存时，投稿系统密码和邮箱授权码会写入 GitHub Secrets，不会写入仓库明文文件。GitHub token 和 Cloudflare token 只用于当前请求，默认不保存到本地文件。
+
 ## 运行模式
 
 | 模式 | 作用 |
