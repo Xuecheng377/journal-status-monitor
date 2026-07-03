@@ -1,0 +1,14 @@
+{
+  "name": "journal-status-local-config-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local-only configuration UI for journal-status-monitor.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test *.test.js"
+  },
+  "dependencies": {
+    "libsodium-wrappers": "^0.7.15"
+  }
+}
