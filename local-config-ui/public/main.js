@@ -202,14 +202,35 @@ function renderAccountList() {
         <span>网址：${account.url || "GitHub Secret 已配置时不可读取明文"}</span>
       </div>
       <div class="account-actions">
+        <button type="button" class="view-account">查看</button>
         <button type="button" class="edit-account">修改</button>
         <button type="button" class="danger delete-account">删除</button>
       </div>
     `;
+    row.querySelector(".view-account").addEventListener("click", () => viewAccount(account));
     row.querySelector(".edit-account").addEventListener("click", () => editAccount(account));
     row.querySelector(".delete-account").addEventListener("click", () => deleteAccount(account));
     list.appendChild(row);
   }
+}
+
+function viewAccount(account) {
+  setStatus(`正在查看 ${account.label}`);
+  showMessages([`${account.label}：${account.complete ? "完整配置" : "配置不完整"}。密码不可读取明文。`], account.complete ? "ok" : "warn");
+  $("preview").textContent = JSON.stringify(
+    {
+      label: account.label,
+      platform: account.platformLabel,
+      slot: account.slot,
+      complete: account.complete,
+      email: account.email || "GitHub Secret 不允许读取明文；修改保存后会显示本地记录",
+      url: account.url || "GitHub Secret 不允许读取明文；修改保存后会显示本地记录",
+      secrets: account.secretNames,
+      configured: account.configured,
+    },
+    null,
+    2,
+  );
 }
 
 function editAccount(account) {
@@ -332,6 +353,15 @@ async function saveConfig() {
     }
     if (result.workflowResult) {
       messages.push("已触发 GitHub Actions 测试邮件 workflow。");
+    }
+    if (result.existingSecrets) {
+      existingSecrets = result.existingSecrets;
+    }
+    if (result.accounts) {
+      configuredAccounts = result.accounts;
+      renderSecretStatus();
+      renderAccountList();
+      messages.push("账号管理列表已刷新。");
     }
     showMessages(messages, "ok");
     $("preview").textContent = JSON.stringify(result, null, 2);
