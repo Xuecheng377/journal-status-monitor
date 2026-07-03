@@ -60,6 +60,12 @@ journal-status-monitor-scheduler
 - 高级设置：终态归档、周报是否包含归档稿件、终态关键词
 - 保存部署：写入 GitHub Secrets、可选部署 Cloudflare、可选触发测试邮件 workflow
 
+## 旧配置读取
+
+页面会自动读取本地 `cloudflare-scheduler/wrangler.toml`，并预填当前检查时间。
+
+GitHub Secrets 不能被读回明文，这是 GitHub 的安全限制。填写 GitHub token 后，可以点击“检查已配置 Secret”查看哪些 Secret 已存在。对于已经存在的密码、授权码等敏感项，输入框可以留空；保存时会保持旧 Secret 不变。只有你填写新值时，才会覆盖对应 Secret。
+
 ## 测试
 
 ```powershell
