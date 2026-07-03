@@ -103,6 +103,45 @@ function hasAnyPlatformInput(account) {
   return hasValue(account?.email) || hasValue(account?.password) || hasValue(account?.url);
 }
 
+function cloneSettings(settings) {
+  return JSON.parse(JSON.stringify(settings || {}));
+}
+
+function assignPlatformAdditionSlots(settings, existingSecrets = {}, previousAssignments = {}) {
+  const nextSettings = cloneSettings(settings);
+  const additions = Array.isArray(nextSettings?.platformAccounts?.additions) ? nextSettings.platformAccounts.additions : [];
+  const assignments = { ...(previousAssignments || {}) };
+  const plannedSecrets = {};
+
+  for (const addition of additions) {
+    if (!hasAnyPlatformInput(addition)) {
+      continue;
+    }
+    const platform = normalizePlatformKey(addition.platform);
+    if (!platform) {
+      throw new Error("新增投稿平台类型必须是 IEEE 或 Elsevier。");
+    }
+
+    let slot = Number.isInteger(addition.slot) ? addition.slot : null;
+    const existingAssignment = addition.id ? assignments[addition.id] : null;
+    if (!slot && existingAssignment?.platform === platform && Number.isInteger(existingAssignment.slot)) {
+      slot = existingAssignment.slot;
+    }
+    if (!slot) {
+      slot = nextAvailablePlatformSlot(platform, existingSecrets, plannedSecrets);
+    }
+
+    addition.platform = platform;
+    addition.slot = slot;
+    assignPlatformValues(plannedSecrets, platform, slot, addition);
+    if (addition.id) {
+      assignments[addition.id] = { platform, slot };
+    }
+  }
+
+  return { settings: nextSettings, assignments };
+}
+
 function assertHour(hour, label) {
   if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
     throw new Error(`${label} must be an integer hour from 0 to 23.`);
@@ -209,7 +248,9 @@ function buildSecrets(settings, options = {}) {
     if (!platform) {
       throw new Error("新增投稿平台类型必须是 IEEE 或 Elsevier。");
     }
-    const slot = nextAvailablePlatformSlot(platform, options.existingSecrets || {}, values);
+    const slot = Number.isInteger(addition.slot)
+      ? addition.slot
+      : nextAvailablePlatformSlot(platform, options.existingSecrets || {}, values);
     assignPlatformValues(values, platform, slot, addition);
   }
 
@@ -338,6 +379,7 @@ module.exports = {
   KEEP_EXISTING_SECRET,
   PLATFORM_KINDS,
   SECRET_FIELDS,
+  assignPlatformAdditionSlots,
   beijingHourToUtcHour,
   buildCronExpressions,
   buildEnvPreview,
