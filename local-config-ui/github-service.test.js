@@ -96,3 +96,32 @@ test("decodes padded GitHub public keys with original base64 variant", async () 
   assert.equal(calls[0], "original");
   assert.equal(Buffer.from(encrypted, "base64").toString("utf8"), "sealed:public-key:secret-value");
 });
+
+test("encodes encrypted GitHub secret as standard padded base64", async () => {
+  const fakeSodium = {
+    ready: Promise.resolve(),
+    base64_variants: {
+      ORIGINAL: "original",
+    },
+    from_base64(value) {
+      return Buffer.from(value, "base64");
+    },
+    from_string(value) {
+      return Buffer.from(value, "utf8");
+    },
+    crypto_box_seal() {
+      return Buffer.from([251, 255, 254, 253]);
+    },
+    to_base64(value, variant) {
+      if (variant === "original") {
+        return Buffer.from(value).toString("base64");
+      }
+      return Buffer.from(value).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    },
+  };
+
+  const encrypted = await encryptSecret("secret-value", Buffer.from("public-key").toString("base64"), fakeSodium);
+
+  assert.equal(encrypted, "+//+/Q==");
+  assert.match(encrypted, /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/);
+});
