@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { encryptSecret, githubHeaders, repoApiBase } = require("./github-service");
+const { deleteRepoSecret, encryptSecret, githubHeaders, repoApiBase } = require("./github-service");
 
 test("builds GitHub API base URL", () => {
   assert.equal(repoApiBase("owner", "repo"), "https://api.github.com/repos/owner/repo");
@@ -124,4 +124,31 @@ test("encodes encrypted GitHub secret as standard padded base64", async () => {
 
   assert.equal(encrypted, "+//+/Q==");
   assert.match(encrypted, /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/);
+});
+
+test("deletes GitHub repository secrets", async () => {
+  const calls = [];
+  const result = await deleteRepoSecret({
+    owner: "owner",
+    repo: "repo",
+    token: "token",
+    name: "IEEE_2_EMAIL",
+    fetchImpl: async (url, options) => {
+      calls.push({ url, method: options.method });
+      return {
+        ok: true,
+        status: 204,
+        text: async () => "",
+      };
+    },
+  });
+
+  assert.equal(result.name, "IEEE_2_EMAIL");
+  assert.equal(result.status, "deleted");
+  assert.deepEqual(calls, [
+    {
+      url: "https://api.github.com/repos/owner/repo/actions/secrets/IEEE_2_EMAIL",
+      method: "DELETE",
+    },
+  ]);
 });
