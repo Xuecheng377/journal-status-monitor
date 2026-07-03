@@ -9,11 +9,14 @@ const {
   DEFAULT_REF,
   DEFAULT_WORKFLOW,
   buildEnvPreview,
+  KEEP_EXISTING_SECRET,
+  mergeExistingSecretValues,
+  parseWranglerToml,
   buildSecrets,
   buildWranglerToml,
   validateSettings,
 } = require("./config-service");
-const { dispatchWorkflow, putRepoSecret } = require("./github-service");
+const { dispatchWorkflow, listRepoSecrets, putRepoSecret } = require("./github-service");
 
 const execFile = promisify(childProcess.execFile);
 const HOST = "127.0.0.1";
@@ -89,13 +92,51 @@ async function serveStatic(req, res) {
 async function handlePreview(req, res) {
   const body = await readJson(req);
   const settings = body.settings || {};
-  const errors = validateSettings(settings);
+  const existingSecrets = body.existingSecrets || {};
+  const errors = validateSettings(settings, { existingSecrets });
+  const mergedSecrets = mergeExistingSecretValues(settings, existingSecrets);
   jsonResponse(res, errors.length ? 400 : 200, {
     ok: errors.length === 0,
     errors,
-    secrets: Object.keys(buildSecrets(settings)).sort(),
+    secrets: Object.keys(mergedSecrets)
+      .filter((name) => mergedSecrets[name] !== KEEP_EXISTING_SECRET)
+      .sort(),
+    keptSecrets: Object.keys(mergedSecrets)
+      .filter((name) => mergedSecrets[name] === KEEP_EXISTING_SECRET)
+      .sort(),
     wranglerToml: buildWranglerToml(settings),
     envPreview: buildEnvPreview(settings),
+  });
+}
+
+async function handleCurrent(req, res) {
+  const body = await readJson(req);
+  const token = body.githubToken?.trim();
+  let parsed = {};
+  try {
+    parsed = parseWranglerToml(await fs.readFile(WRANGLER_PATH, "utf8"));
+  } catch {
+    parsed = parseWranglerToml("");
+  }
+
+  let existingSecrets = {};
+  if (token) {
+    const repo = {
+      owner: body.repository?.owner?.trim() || parsed.repository?.owner || DEFAULT_OWNER,
+      repo: body.repository?.name?.trim() || parsed.repository?.name || DEFAULT_REPO,
+    };
+    existingSecrets = await listRepoSecrets({
+      owner: repo.owner,
+      repo: repo.repo,
+      token,
+    });
+  }
+
+  jsonResponse(res, 200, {
+    ok: true,
+    repository: parsed.repository,
+    schedule: parsed.schedule,
+    existingSecrets,
   });
 }
 
@@ -104,7 +145,8 @@ async function handleSave(req, res) {
   const settings = body.settings || {};
   const tokens = body.tokens || {};
   const actions = body.actions || {};
-  const errors = validateSettings(settings);
+  const existingSecrets = body.existingSecrets || {};
+  const errors = validateSettings(settings, { existingSecrets });
   if (errors.length) {
     jsonResponse(res, 400, { ok: false, errors });
     return;
@@ -115,9 +157,14 @@ async function handleSave(req, res) {
   }
 
   const repo = repoFromSettings(settings);
-  const secrets = buildSecrets(settings);
+  const secrets = mergeExistingSecretValues(settings, existingSecrets);
   const updatedSecrets = [];
+  const keptSecrets = [];
   for (const [name, value] of Object.entries(secrets)) {
+    if (value === KEEP_EXISTING_SECRET) {
+      keptSecrets.push(name);
+      continue;
+    }
     await putRepoSecret({
       owner: repo.owner,
       repo: repo.repo,
@@ -154,6 +201,7 @@ async function handleSave(req, res) {
   jsonResponse(res, 200, {
     ok: true,
     updatedSecrets: updatedSecrets.sort(),
+    keptSecrets: keptSecrets.sort(),
     wranglerPath: WRANGLER_PATH,
     deployResult,
     workflowResult,
@@ -180,6 +228,10 @@ async function route(req, res) {
     }
     if (req.method === "POST" && req.url === "/api/preview") {
       await handlePreview(req, res);
+      return;
+    }
+    if (req.method === "POST" && req.url === "/api/current") {
+      await handleCurrent(req, res);
       return;
     }
     if (req.method === "POST" && req.url === "/api/save") {
