@@ -86,9 +86,33 @@ jobs:
           IEEE_EMAIL: ${{ secrets.IEEE_EMAIL }}
           IEEE_PASSWORD: ${{ secrets.IEEE_PASSWORD }}
           IEEE_URL: ${{ secrets.IEEE_URL }}
+          IEEE_2_EMAIL: ${{ secrets.IEEE_2_EMAIL }}
+          IEEE_2_PASSWORD: ${{ secrets.IEEE_2_PASSWORD }}
+          IEEE_2_URL: ${{ secrets.IEEE_2_URL }}
+          IEEE_3_EMAIL: ${{ secrets.IEEE_3_EMAIL }}
+          IEEE_3_PASSWORD: ${{ secrets.IEEE_3_PASSWORD }}
+          IEEE_3_URL: ${{ secrets.IEEE_3_URL }}
+          IEEE_4_EMAIL: ${{ secrets.IEEE_4_EMAIL }}
+          IEEE_4_PASSWORD: ${{ secrets.IEEE_4_PASSWORD }}
+          IEEE_4_URL: ${{ secrets.IEEE_4_URL }}
+          IEEE_5_EMAIL: ${{ secrets.IEEE_5_EMAIL }}
+          IEEE_5_PASSWORD: ${{ secrets.IEEE_5_PASSWORD }}
+          IEEE_5_URL: ${{ secrets.IEEE_5_URL }}
           ELSEVIER_EMAIL: ${{ secrets.ELSEVIER_EMAIL }}
           ELSEVIER_PASSWORD: ${{ secrets.ELSEVIER_PASSWORD }}
           ELSEVIER_URL: ${{ secrets.ELSEVIER_URL }}
+          ELSEVIER_2_EMAIL: ${{ secrets.ELSEVIER_2_EMAIL }}
+          ELSEVIER_2_PASSWORD: ${{ secrets.ELSEVIER_2_PASSWORD }}
+          ELSEVIER_2_URL: ${{ secrets.ELSEVIER_2_URL }}
+          ELSEVIER_3_EMAIL: ${{ secrets.ELSEVIER_3_EMAIL }}
+          ELSEVIER_3_PASSWORD: ${{ secrets.ELSEVIER_3_PASSWORD }}
+          ELSEVIER_3_URL: ${{ secrets.ELSEVIER_3_URL }}
+          ELSEVIER_4_EMAIL: ${{ secrets.ELSEVIER_4_EMAIL }}
+          ELSEVIER_4_PASSWORD: ${{ secrets.ELSEVIER_4_PASSWORD }}
+          ELSEVIER_4_URL: ${{ secrets.ELSEVIER_4_URL }}
+          ELSEVIER_5_EMAIL: ${{ secrets.ELSEVIER_5_EMAIL }}
+          ELSEVIER_5_PASSWORD: ${{ secrets.ELSEVIER_5_PASSWORD }}
+          ELSEVIER_5_URL: ${{ secrets.ELSEVIER_5_URL }}
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
