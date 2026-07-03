@@ -89,6 +89,25 @@ header p,
   line-height: 1.5;
 }
 
+.secret-status {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: -4px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--muted);
+  background: #f8fafc;
+  font-size: 12px;
+}
+
+.secret-status.ok {
+  color: var(--green);
+  background: #f6fef9;
+  border-color: #abefc6;
+}
+
 header p {
   margin-top: 7px;
 }
