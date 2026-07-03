@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
 let existingSecrets = {};
+let configuredAccounts = [];
 let additionCount = 0;
 
 function intValue(id, fallback) {
@@ -32,6 +33,7 @@ function existingPlatformSlots(platform) {
 function collectPlatformAdditions() {
   return Array.from(document.querySelectorAll(".platform-addition")).map((card) => ({
     id: card.dataset.additionId,
+    slot: card.dataset.slot ? Number.parseInt(card.dataset.slot, 10) : undefined,
     platform: card.querySelector("[data-field='platform']").value,
     url: card.querySelector("[data-field='url']").value,
     email: card.querySelector("[data-field='email']").value,
@@ -111,7 +113,9 @@ function applyCurrentConfig(data) {
     $("normalMinute").value = String(data.schedule.normalChecks.minute ?? 17);
   }
   existingSecrets = data.existingSecrets || existingSecrets;
+  configuredAccounts = data.accounts || configuredAccounts;
   renderSecretStatus();
+  renderAccountList();
 }
 
 function renderSecretStatus() {
@@ -131,9 +135,16 @@ function addPlatformCard(initial = {}) {
   card.className = "card platform-addition";
   card.dataset.index = String(additionCount);
   card.dataset.additionId = initial.id || `addition-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  if (initial.slot) {
+    card.dataset.slot = String(initial.slot);
+  }
+  const title = initial.slot ? `修改 ${String(initial.label || "").trim() || `槽位 ${initial.slot}`}` : `新增投稿账号 ${additionCount}`;
+  const hint = initial.slot
+    ? "这组会覆盖指定槽位。密码留空时，如果该槽位已配置密码，会保持旧密码不变。"
+    : "这组会写入下一个空 Secret 槽位，例如 IEEE_2_EMAIL，不会覆盖 IEEE_EMAIL。";
   card.innerHTML = `
     <div class="card-title-row">
-      <h3>新增投稿账号 ${additionCount}</h3>
+      <h3>${title}</h3>
       <button type="button" class="ghost remove-platform">移除</button>
     </div>
     <label>投稿平台
@@ -144,15 +155,100 @@ function addPlatformCard(initial = {}) {
     </label>
     <label>投稿系统网址<input data-field="url" placeholder="https://mc.manuscriptcentral.com/..."></label>
     <label>登录邮箱 / 用户名<input data-field="email" autocomplete="username"></label>
-    <label>登录密码<input data-field="password" type="password" autocomplete="new-password"></label>
-    <p class="hint">这组会写入下一个空 Secret 槽位，例如 IEEE_2_EMAIL，不会覆盖 IEEE_EMAIL。</p>
+    <label>登录密码<input data-field="password" type="password" autocomplete="new-password" placeholder="${initial.slot ? "留空保持旧密码" : ""}"></label>
+    <p class="hint">${hint}</p>
   `;
   card.querySelector("[data-field='platform']").value = initial.platform || "ieee";
+  if (initial.slot) {
+    card.querySelector("[data-field='platform']").disabled = true;
+  }
   card.querySelector("[data-field='url']").value = initial.url || "";
   card.querySelector("[data-field='email']").value = initial.email || "";
   card.querySelector("[data-field='password']").value = initial.password || "";
   card.querySelector(".remove-platform").addEventListener("click", () => card.remove());
   $("platformAdditions").appendChild(card);
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function renderAccountList() {
+  const list = $("accountList");
+  if (!list) {
+    return;
+  }
+  list.innerHTML = "";
+  if (!configuredAccounts.length) {
+    const empty = document.createElement("div");
+    empty.className = "message warn";
+    empty.textContent = "尚未加载账号列表。填写 GitHub Token 后点击“刷新账号列表”。";
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const account of configuredAccounts) {
+    const row = document.createElement("div");
+    row.className = "account-row";
+    const missing = Object.entries(account.configured || {})
+      .filter(([, value]) => !value)
+      .map(([name]) => name.toUpperCase())
+      .join("、");
+    row.innerHTML = `
+      <div class="account-main">
+        <div class="account-title">${account.label}</div>
+        <span class="status-pill ${account.complete ? "ok" : "warn"}">${account.complete ? "完整配置" : `不完整：缺少 ${missing}`}</span>
+      </div>
+      <div class="account-meta">
+        <span>平台：${account.platformLabel}</span>
+        <span>邮箱：${account.email || "GitHub Secret 已配置时不可读取明文"}</span>
+        <span>网址：${account.url || "GitHub Secret 已配置时不可读取明文"}</span>
+      </div>
+      <div class="account-actions">
+        <button type="button" class="edit-account">修改</button>
+        <button type="button" class="danger delete-account">删除</button>
+      </div>
+    `;
+    row.querySelector(".edit-account").addEventListener("click", () => editAccount(account));
+    row.querySelector(".delete-account").addEventListener("click", () => deleteAccount(account));
+    list.appendChild(row);
+  }
+}
+
+function editAccount(account) {
+  addPlatformCard({
+    id: `edit-${account.platform}-${account.slot}`,
+    label: account.label,
+    platform: account.platform,
+    slot: account.slot,
+    email: account.email || "",
+    url: account.url || "",
+  });
+  showMessages([`已打开 ${account.label} 的修改表单。密码留空会保持旧密码。`], "warn");
+}
+
+async function deleteAccount(account) {
+  const legacyText = account.slot === 1 ? "这是第一组旧配置，删除后该平台主账号会失效。" : "";
+  const ok = window.confirm(`确认删除 ${account.label} 吗？${legacyText}\n将删除对应的 EMAIL、PASSWORD、URL 三个 GitHub Secret。`);
+  if (!ok) {
+    return;
+  }
+  setStatus("正在删除账号...");
+  try {
+    const result = await postJson("/api/delete-account", {
+      githubToken: $("githubToken").value,
+      repository: {
+        owner: "Xuecheng377",
+        name: "journal-status-monitor",
+      },
+      account: {
+        platform: account.platform,
+        slot: account.slot,
+      },
+    });
+    showMessages([`已删除 ${result.label}：${result.deletedSecrets.join(", ")}`], "ok");
+    await loadCurrentConfig();
+  } catch (error) {
+    setStatus("删除失败");
+    showMessages(error.errors || [String(error)], "error");
+  }
 }
 
 function collectActions() {
@@ -272,5 +368,6 @@ $("saveBtn").addEventListener("click", saveConfig);
 $("loadBtn").addEventListener("click", loadCurrentConfig);
 $("checkSecretsBtn").addEventListener("click", loadCurrentConfig);
 $("addPlatformBtn").addEventListener("click", () => addPlatformCard());
+$("refreshAccountsBtn").addEventListener("click", loadCurrentConfig);
 
 loadCurrentConfig();
