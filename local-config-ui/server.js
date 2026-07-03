@@ -8,6 +8,7 @@ const {
   DEFAULT_REPO,
   DEFAULT_REF,
   DEFAULT_WORKFLOW,
+  assignPlatformAdditionSlots,
   buildEnvPreview,
   KEEP_EXISTING_SECRET,
   mergeExistingSecretValues,
@@ -24,6 +25,8 @@ const PORT = Number(process.env.PORT || 8976);
 const ROOT_DIR = path.resolve(__dirname, "..");
 const PUBLIC_DIR = path.join(__dirname, "public");
 const WRANGLER_PATH = path.join(ROOT_DIR, "cloudflare-scheduler", "wrangler.toml");
+const LOCAL_DATA_DIR = path.join(__dirname, "data");
+const SLOT_ASSIGNMENTS_PATH = path.join(LOCAL_DATA_DIR, "platform-slot-assignments.json");
 
 function jsonResponse(res, statusCode, payload) {
   const body = JSON.stringify(payload);
@@ -52,6 +55,19 @@ async function readJson(req) {
     return {};
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+async function readSlotAssignments() {
+  try {
+    return JSON.parse(await fs.readFile(SLOT_ASSIGNMENTS_PATH, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+async function writeSlotAssignments(assignments) {
+  await fs.mkdir(LOCAL_DATA_DIR, { recursive: true });
+  await fs.writeFile(SLOT_ASSIGNMENTS_PATH, JSON.stringify(assignments, null, 2), "utf8");
 }
 
 function repoFromSettings(settings) {
@@ -107,8 +123,10 @@ async function handlePreview(req, res) {
   const body = await readJson(req);
   const settings = body.settings || {};
   const existingSecrets = body.existingSecrets || {};
-  const errors = validateSettings(settings, { existingSecrets });
-  const mergedSecrets = mergeExistingSecretValues(settings, existingSecrets);
+  const slotState = assignPlatformAdditionSlots(settings, existingSecrets, {});
+  const settingsWithSlots = slotState.settings;
+  const errors = validateSettings(settingsWithSlots, { existingSecrets });
+  const mergedSecrets = mergeExistingSecretValues(settingsWithSlots, existingSecrets);
   jsonResponse(res, errors.length ? 400 : 200, {
     ok: errors.length === 0,
     errors,
@@ -118,8 +136,8 @@ async function handlePreview(req, res) {
     keptSecrets: Object.keys(mergedSecrets)
       .filter((name) => mergedSecrets[name] === KEEP_EXISTING_SECRET)
       .sort(),
-    wranglerToml: buildWranglerToml(settings),
-    envPreview: buildEnvPreview(settings, existingSecrets),
+    wranglerToml: buildWranglerToml(settingsWithSlots),
+    envPreview: buildEnvPreview(settingsWithSlots, existingSecrets),
   });
 }
 
@@ -171,13 +189,16 @@ async function handleSave(req, res) {
     token: tokens.githubToken.trim(),
   });
   const existingSecrets = { ...(body.existingSecrets || {}), ...liveExistingSecrets };
-  const errors = validateSettings(settings, { existingSecrets });
+  const previousAssignments = await readSlotAssignments();
+  const slotState = assignPlatformAdditionSlots(settings, existingSecrets, previousAssignments);
+  const settingsWithSlots = slotState.settings;
+  const errors = validateSettings(settingsWithSlots, { existingSecrets });
   if (errors.length) {
     jsonResponse(res, 400, { ok: false, errors });
     return;
   }
 
-  const secrets = mergeExistingSecretValues(settings, existingSecrets);
+  const secrets = mergeExistingSecretValues(settingsWithSlots, existingSecrets);
   const updatedSecrets = [];
   const keptSecrets = [];
   for (const [name, value] of Object.entries(secrets)) {
@@ -195,7 +216,8 @@ async function handleSave(req, res) {
     updatedSecrets.push(name);
   }
 
-  await fs.writeFile(WRANGLER_PATH, buildWranglerToml(settings), "utf8");
+  await fs.writeFile(WRANGLER_PATH, buildWranglerToml(settingsWithSlots), "utf8");
+  await writeSlotAssignments(slotState.assignments);
 
   let deployResult = null;
   if (actions.deployCloudflare) {
