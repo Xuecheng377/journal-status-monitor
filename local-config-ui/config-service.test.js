@@ -4,6 +4,7 @@ const {
   beijingHourToUtcHour,
   buildCronExpressions,
   buildSecrets,
+  assignPlatformAdditionSlots,
   KEEP_EXISTING_SECRET,
   mergeExistingSecretValues,
   parseWranglerToml,
@@ -148,6 +149,61 @@ test("new platform accounts start from slot 2 even when existing secrets were no
   assert.equal(secrets.IEEE_2_EMAIL, "new-author@example.com");
   assert.equal(secrets.IEEE_2_PASSWORD, "new-password");
   assert.equal(secrets.IEEE_2_URL, "https://mc.manuscriptcentral.com/new");
+});
+
+test("uses explicit slot for retrying the same added platform account", () => {
+  const settings = completeSettings();
+  delete settings.platforms;
+  settings.platformAccounts = {
+    additions: [
+      {
+        platform: "ieee",
+        slot: 2,
+        email: "new-author@example.com",
+        password: "new-password",
+        url: "https://mc.manuscriptcentral.com/new",
+      },
+    ],
+  };
+
+  const secrets = buildSecrets(settings, {
+    existingSecrets: {
+      IEEE_2_EMAIL: true,
+      IEEE_2_PASSWORD: true,
+      IEEE_2_URL: true,
+    },
+  });
+
+  assert.equal(secrets.IEEE_2_EMAIL, "new-author@example.com");
+  assert.equal(Object.hasOwn(secrets, "IEEE_3_EMAIL"), false);
+});
+
+test("records and reuses platform addition slot assignments", () => {
+  const settings = completeSettings();
+  delete settings.platforms;
+  settings.platformAccounts = {
+    additions: [
+      {
+        id: "addition-1",
+        platform: "ieee",
+        email: "new-author@example.com",
+        password: "new-password",
+        url: "https://mc.manuscriptcentral.com/new",
+      },
+    ],
+  };
+
+  const first = assignPlatformAdditionSlots(settings, {}, {});
+  assert.equal(first.settings.platformAccounts.additions[0].slot, 2);
+  assert.deepEqual(first.assignments["addition-1"], { platform: "ieee", slot: 2 });
+
+  const retry = assignPlatformAdditionSlots(settings, {
+    IEEE_2_EMAIL: true,
+    IEEE_2_PASSWORD: true,
+    IEEE_2_URL: true,
+  }, first.assignments);
+
+  assert.equal(retry.settings.platformAccounts.additions[0].slot, 2);
 });
 
 test("validates blank secret fields when an existing secret is present", () => {
