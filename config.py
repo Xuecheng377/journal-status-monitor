@@ -7,6 +7,7 @@ from typing import Iterable
 
 
 TRUE_VALUES = {"1", "true", "yes", "y", "on"}
+MAX_PLATFORM_SLOTS = 5
 
 
 def first_env(*names: str, default: str | None = None) -> str | None:
@@ -62,6 +63,25 @@ class PlatformAccount:
         return any([self.email, self.password, self.url]) and not self.configured
 
 
+def platform_slot_names(prefix: str, slot: int) -> tuple[str, str, str]:
+    env_prefix = prefix if slot == 1 else f"{prefix}_{slot}"
+    return f"{env_prefix}_EMAIL", f"{env_prefix}_PASSWORD", f"{env_prefix}_URL"
+
+
+def read_platform_account(name: str, prefix: str, slot: int) -> PlatformAccount:
+    email_name, password_name, url_name = platform_slot_names(prefix, slot)
+    if slot == 1:
+        email = first_env(email_name, f"{prefix}_USERNAME")
+    else:
+        email = first_env(email_name, f"{prefix}_{slot}_USERNAME")
+    return PlatformAccount(
+        name,
+        email,
+        first_env(password_name),
+        first_env(url_name),
+    )
+
+
 class Config:
     # Accept both documented *_EMAIL names and older *_USERNAME aliases.
     IEEE_EMAIL = first_env("IEEE_EMAIL", "IEEE_USERNAME")
@@ -105,15 +125,20 @@ class Config:
 
     @classmethod
     def ieee_account(cls) -> PlatformAccount:
-        return PlatformAccount("IEEE", cls.IEEE_EMAIL, cls.IEEE_PASSWORD, cls.IEEE_URL)
+        return read_platform_account("IEEE", "IEEE", 1)
 
     @classmethod
     def elsevier_account(cls) -> PlatformAccount:
-        return PlatformAccount("Elsevier", cls.ELSEVIER_EMAIL, cls.ELSEVIER_PASSWORD, cls.ELSEVIER_URL)
+        return read_platform_account("Elsevier", "ELSEVIER", 1)
 
     @classmethod
     def platform_accounts(cls) -> list[PlatformAccount]:
-        return [cls.ieee_account(), cls.elsevier_account()]
+        accounts: list[PlatformAccount] = []
+        for slot in range(1, MAX_PLATFORM_SLOTS + 1):
+            accounts.append(read_platform_account("IEEE", "IEEE", slot))
+        for slot in range(1, MAX_PLATFORM_SLOTS + 1):
+            accounts.append(read_platform_account("Elsevier", "ELSEVIER", slot))
+        return accounts
 
     @classmethod
     def configured_platforms(cls) -> list[PlatformAccount]:
