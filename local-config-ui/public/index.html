@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>期刊状态监控配置</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <aside>
+    <div class="brand">期刊状态监控</div>
+    <nav>
+      <a href="#platforms" class="active">投稿平台</a>
+      <a href="#email">邮件通知</a>
+      <a href="#schedule">检查时间</a>
+      <a href="#runtime">高级设置</a>
+      <a href="#deploy">保存部署</a>
+    </nav>
+  </aside>
+
+  <main>
+    <header>
+      <div>
+        <h1>本地配置后台</h1>
+        <p>只监听 localhost。密码和授权码通过 API 写入 GitHub Secrets，不写入仓库文件。</p>
+      </div>
+      <div class="header-actions">
+        <button id="previewBtn" type="button">预览配置</button>
+        <button id="saveBtn" type="button" class="primary">保存</button>
+      </div>
+    </header>
+
+    <section id="platforms" class="panel">
+      <div class="panel-title">
+        <h2>投稿平台</h2>
+        <span>至少完整配置一个平台</span>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3>IEEE ScholarOne</h3>
+          <label>投稿系统网址<input id="ieeeUrl" placeholder="https://mc.manuscriptcentral.com/..."></label>
+          <label>登录邮箱 / 用户名<input id="ieeeEmail" autocomplete="username"></label>
+          <label>登录密码<input id="ieeePassword" type="password" autocomplete="current-password"></label>
+        </div>
+        <div class="card">
+          <h3>Elsevier Editorial Manager</h3>
+          <label>投稿系统网址<input id="elsevierUrl" placeholder="https://www.editorialmanager.com/..."></label>
+          <label>登录邮箱 / 用户名<input id="elsevierEmail" autocomplete="username"></label>
+          <label>登录密码<input id="elsevierPassword" type="password" autocomplete="current-password"></label>
+        </div>
+      </div>
+    </section>
+
+    <section id="email" class="panel">
+      <div class="panel-title">
+        <h2>邮件通知</h2>
+        <span>用于测试邮件、状态变化邮件和每周一周报</span>
+      </div>
+      <div class="grid two">
+        <label>发件邮箱<input id="emailSender" placeholder="sender@example.com"></label>
+        <label>SMTP 授权码<input id="emailPassword" type="password"></label>
+        <label>收件人<input id="emailReceivers" placeholder="receiver@example.com, other@example.com"></label>
+        <label>SMTP 服务器<input id="smtpServer" placeholder="留空则按邮箱域名自动推断"></label>
+        <label>SMTP 端口<input id="smtpPort" inputmode="numeric" placeholder="465 或 587"></label>
+      </div>
+    </section>
+
+    <section id="schedule" class="panel">
+      <div class="panel-title">
+        <h2>检查时间</h2>
+        <span>均为北京时间；系统自动添加 27/37 分兜底</span>
+      </div>
+      <div class="grid two">
+        <div class="card">
+          <h3>每周报告</h3>
+          <label>星期
+            <select id="weeklyDay">
+              <option value="1">周一</option>
+              <option value="2">周二</option>
+              <option value="3">周三</option>
+              <option value="4">周四</option>
+              <option value="5">周五</option>
+              <option value="6">周六</option>
+              <option value="0">周日</option>
+            </select>
+          </label>
+          <label>小时<input id="weeklyHour" inputmode="numeric" value="8"></label>
+          <label>主触发分钟<input id="weeklyMinute" inputmode="numeric" value="17"></label>
+        </div>
+        <div class="card">
+          <h3>普通状态检查</h3>
+          <label>每天检查小时，英文逗号分隔
+            <input id="normalHours" value="11,12,14,17,20,22">
+          </label>
+          <label>主触发分钟<input id="normalMinute" inputmode="numeric" value="17"></label>
+          <p class="hint">例：填写 11,12,14，实际会在 11:17/27/37、12:17/27/37、14:17/27/37 唤醒；兜底点会自动去重。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="runtime" class="panel">
+      <div class="panel-title">
+        <h2>高级设置</h2>
+        <span>通常保持默认即可</span>
+      </div>
+      <div class="grid two">
+        <label class="check"><input id="archiveTerminal" type="checkbox" checked> 终态稿件自动归档</label>
+        <label class="check"><input id="includeArchived" type="checkbox"> 周报包含已归档稿件</label>
+        <label class="wide">终态关键词
+          <textarea id="terminalKeywords">accept,accepted,acceptance,published,online,final decision,reject,rejected,declined,withdrawn,transferred,completed</textarea>
+        </label>
+      </div>
+    </section>
+
+    <section id="deploy" class="panel">
+      <div class="panel-title">
+        <h2>保存部署</h2>
+        <span>Token 只用于本次请求，不保存到文件</span>
+      </div>
+      <div class="grid two">
+        <label>GitHub Token<input id="githubToken" type="password" placeholder="需要 Actions/Secrets 写权限"></label>
+        <label>Cloudflare API Token<input id="cloudflareToken" type="password" placeholder="部署 Worker 时需要"></label>
+        <label class="check"><input id="deployCloudflare" type="checkbox" checked> 保存后部署 Cloudflare Worker</label>
+        <label class="check"><input id="dispatchTest" type="checkbox"> 保存后触发测试邮件 workflow</label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">
+        <h2>预览 / 结果</h2>
+        <span id="statusText">尚未预览</span>
+      </div>
+      <div id="messages" class="messages"></div>
+      <pre id="preview"></pre>
+    </section>
+  </main>
+
+  <script src="/main.js"></script>
+</body>
+</html>
