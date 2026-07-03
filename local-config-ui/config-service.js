@@ -74,6 +74,14 @@ function platformSecretNames(platform, slot) {
   };
 }
 
+function platformSlotLabel(platform, slot) {
+  const kind = platformKind(platform);
+  if (!kind) {
+    throw new Error("投稿平台类型必须是 IEEE 或 Elsevier。");
+  }
+  return slot === 1 ? kind.prefix : `${kind.prefix}_${slot}`;
+}
+
 function slotHasAnyValue(names, source) {
   return [names.email, names.password, names.url].some((name) => {
     const value = source?.[name];
@@ -101,6 +109,39 @@ function assignPlatformValues(values, platform, slot, account) {
 
 function hasAnyPlatformInput(account) {
   return hasValue(account?.email) || hasValue(account?.password) || hasValue(account?.url);
+}
+
+function listPlatformAccounts(existingSecrets = {}, metadata = {}) {
+  const accounts = [];
+  for (const kind of PLATFORM_KINDS) {
+    for (let slot = 1; slot <= MAX_PLATFORM_SLOTS; slot += 1) {
+      const label = platformSlotLabel(kind.key, slot);
+      const names = platformSecretNames(kind.key, slot);
+      const configured = {
+        email: Boolean(existingSecrets[names.email]),
+        password: Boolean(existingSecrets[names.password]),
+        url: Boolean(existingSecrets[names.url]),
+      };
+      const local = metadata[label] || {};
+      const visible = configured.email || configured.password || configured.url || Boolean(local.email || local.url);
+      if (!visible) {
+        continue;
+      }
+      accounts.push({
+        platform: kind.key,
+        platformLabel: kind.label,
+        slot,
+        label,
+        secretNames: names,
+        configured,
+        complete: configured.email && configured.password && configured.url,
+        email: normalizeText(local.email),
+        url: normalizeText(local.url),
+        updatedAt: normalizeText(local.updatedAt),
+      });
+    }
+  }
+  return accounts;
 }
 
 function cloneSettings(settings) {
@@ -385,8 +426,10 @@ module.exports = {
   buildEnvPreview,
   buildSecrets,
   buildWranglerToml,
+  listPlatformAccounts,
   mergeExistingSecretValues,
   parseWranglerToml,
+  platformSlotLabel,
   platformSecretNames,
   validateSettings,
 };
