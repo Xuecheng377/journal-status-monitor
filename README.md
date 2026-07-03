@@ -152,6 +152,8 @@ http://127.0.0.1:8976
 
 这个网页可以填写投稿平台、邮件通知、检查时间和归档规则。保存时，投稿系统密码和邮箱授权码会写入 GitHub Secrets，不会写入仓库明文文件。GitHub token 和 Cloudflare token 只用于当前请求，默认不保存到本地文件。
 
+页面会自动读取本地 `cloudflare-scheduler/wrangler.toml` 并预填当前检查时间。GitHub Secrets 不能读回明文，但填写 GitHub token 后可以检查哪些 Secret 已存在；已存在的密码或授权码输入框可以留空，保存时会保持旧 Secret 不变。
+
 ## 运行模式
 
 | 模式 | 作用 |
