@@ -4,14 +4,13 @@ const DEFAULT_WORKFLOW = "monitor.yml";
 const DEFAULT_REF = "main";
 const FALLBACK_MINUTES = [17, 27, 37];
 const KEEP_EXISTING_SECRET = "__KEEP_EXISTING_SECRET__";
+const MAX_PLATFORM_SLOTS = 5;
+const PLATFORM_KINDS = [
+  { key: "ieee", label: "IEEE ScholarOne", prefix: "IEEE" },
+  { key: "elsevier", label: "Elsevier Editorial Manager", prefix: "ELSEVIER" },
+];
 
-const SECRET_FIELDS = [
-  "IEEE_EMAIL",
-  "IEEE_PASSWORD",
-  "IEEE_URL",
-  "ELSEVIER_EMAIL",
-  "ELSEVIER_PASSWORD",
-  "ELSEVIER_URL",
+const RUNTIME_SECRET_FIELDS = [
   "EMAIL_SENDER",
   "EMAIL_PASSWORD",
   "EMAIL_RECEIVER",
@@ -22,6 +21,7 @@ const SECRET_FIELDS = [
   "INCLUDE_ARCHIVED_IN_REPORT",
   "TERMINAL_STATUS_KEYWORDS",
 ];
+const SECRET_FIELDS = [...platformSecretFields(), ...RUNTIME_SECRET_FIELDS];
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -29,6 +29,78 @@ function normalizeText(value) {
 
 function hasValue(value) {
   return normalizeText(value).length > 0;
+}
+
+function platformSecretFields() {
+  const fields = [];
+  for (const kind of PLATFORM_KINDS) {
+    for (let slot = 1; slot <= MAX_PLATFORM_SLOTS; slot += 1) {
+      const prefix = slot === 1 ? kind.prefix : `${kind.prefix}_${slot}`;
+      fields.push(`${prefix}_EMAIL`, `${prefix}_PASSWORD`, `${prefix}_URL`);
+    }
+  }
+  return fields;
+}
+
+function normalizePlatformKey(value) {
+  const text = normalizeText(value).toLowerCase();
+  if (["ieee", "scholarone", "scholar_one"].includes(text) || text.includes("ieee")) {
+    return "ieee";
+  }
+  if (["elsevier", "editorialmanager", "editorial_manager"].includes(text) || text.includes("elsevier")) {
+    return "elsevier";
+  }
+  return "";
+}
+
+function platformKind(platform) {
+  const key = normalizePlatformKey(platform);
+  return PLATFORM_KINDS.find((kind) => kind.key === key);
+}
+
+function platformSecretNames(platform, slot) {
+  const kind = platformKind(platform);
+  if (!kind) {
+    throw new Error("新增投稿平台类型必须是 IEEE 或 Elsevier。");
+  }
+  if (!Number.isInteger(slot) || slot < 1 || slot > MAX_PLATFORM_SLOTS) {
+    throw new Error(`投稿平台槽位必须是 1-${MAX_PLATFORM_SLOTS}。`);
+  }
+  const prefix = slot === 1 ? kind.prefix : `${kind.prefix}_${slot}`;
+  return {
+    email: `${prefix}_EMAIL`,
+    password: `${prefix}_PASSWORD`,
+    url: `${prefix}_URL`,
+  };
+}
+
+function slotHasAnyValue(names, source) {
+  return [names.email, names.password, names.url].some((name) => {
+    const value = source?.[name];
+    return value === KEEP_EXISTING_SECRET || value === true || hasValue(value);
+  });
+}
+
+function nextAvailablePlatformSlot(platform, existingSecrets, plannedSecrets) {
+  for (let slot = 2; slot <= MAX_PLATFORM_SLOTS; slot += 1) {
+    const names = platformSecretNames(platform, slot);
+    if (!slotHasAnyValue(names, existingSecrets) && !slotHasAnyValue(names, plannedSecrets)) {
+      return slot;
+    }
+  }
+  const kind = platformKind(platform);
+  throw new Error(`${kind?.label || platform} 已达到 ${MAX_PLATFORM_SLOTS} 个账号上限。`);
+}
+
+function assignPlatformValues(values, platform, slot, account) {
+  const names = platformSecretNames(platform, slot);
+  values[names.email] = account?.email;
+  values[names.password] = account?.password;
+  values[names.url] = account?.url;
+}
+
+function hasAnyPlatformInput(account) {
+  return hasValue(account?.email) || hasValue(account?.password) || hasValue(account?.url);
 }
 
 function assertHour(hour, label) {
@@ -106,17 +178,12 @@ function buildWranglerToml(settings) {
   ].join("\n");
 }
 
-function buildSecrets(settings) {
+function buildSecrets(settings, options = {}) {
   const platforms = settings?.platforms || {};
+  const additions = Array.isArray(settings?.platformAccounts?.additions) ? settings.platformAccounts.additions : [];
   const email = settings?.email || {};
   const runtime = settings?.runtime || {};
   const values = {
-    IEEE_EMAIL: platforms.ieee?.email,
-    IEEE_PASSWORD: platforms.ieee?.password,
-    IEEE_URL: platforms.ieee?.url,
-    ELSEVIER_EMAIL: platforms.elsevier?.email,
-    ELSEVIER_PASSWORD: platforms.elsevier?.password,
-    ELSEVIER_URL: platforms.elsevier?.url,
     EMAIL_SENDER: email.sender,
     EMAIL_PASSWORD: email.password,
     EMAIL_RECEIVER: email.receivers,
@@ -128,13 +195,31 @@ function buildSecrets(settings) {
     TERMINAL_STATUS_KEYWORDS: runtime.terminalStatusKeywords,
   };
 
+  if (platforms.ieee) {
+    assignPlatformValues(values, "ieee", 1, platforms.ieee);
+  }
+  if (platforms.elsevier) {
+    assignPlatformValues(values, "elsevier", 1, platforms.elsevier);
+  }
+  for (const addition of additions) {
+    if (!hasAnyPlatformInput(addition)) {
+      continue;
+    }
+    const platform = normalizePlatformKey(addition.platform);
+    if (!platform) {
+      throw new Error("新增投稿平台类型必须是 IEEE 或 Elsevier。");
+    }
+    const slot = nextAvailablePlatformSlot(platform, options.existingSecrets || {}, values);
+    assignPlatformValues(values, platform, slot, addition);
+  }
+
   return Object.fromEntries(
     SECRET_FIELDS.map((name) => [name, normalizeText(values[name])]).filter(([, value]) => hasValue(value)),
   );
 }
 
 function mergeExistingSecretValues(settings, existingSecrets = {}) {
-  const secrets = buildSecrets(settings);
+  const secrets = buildSecrets(settings, { existingSecrets });
   for (const name of SECRET_FIELDS) {
     if (!secrets[name] && existingSecrets[name]) {
       secrets[name] = KEEP_EXISTING_SECRET;
@@ -143,8 +228,8 @@ function mergeExistingSecretValues(settings, existingSecrets = {}) {
   return secrets;
 }
 
-function buildEnvPreview(settings) {
-  return Object.entries(buildSecrets(settings))
+function buildEnvPreview(settings, existingSecrets = {}) {
+  return Object.entries(buildSecrets(settings, { existingSecrets }))
     .map(([name, value]) => `${name}=${value}`)
     .join("\n");
 }
@@ -155,21 +240,29 @@ function activeSecrets(settings, existingSecrets = {}) {
 
 function validateSettings(settings, options = {}) {
   const errors = [];
-  const secrets = activeSecrets(settings, options.existingSecrets || {});
-  const ieeeNames = ["IEEE_EMAIL", "IEEE_PASSWORD", "IEEE_URL"];
-  const elsevierNames = ["ELSEVIER_EMAIL", "ELSEVIER_PASSWORD", "ELSEVIER_URL"];
-  const ieeeAny = ieeeNames.some((name) => secrets[name]);
-  const ieeeAll = ieeeNames.every((name) => secrets[name]);
-  const elsevierAny = elsevierNames.some((name) => secrets[name]);
-  const elsevierAll = elsevierNames.every((name) => secrets[name]);
+  let secrets = {};
+  try {
+    secrets = activeSecrets(settings, options.existingSecrets || {});
+  } catch (error) {
+    errors.push(error.message);
+  }
 
-  if (ieeeAny && !ieeeAll) {
-    errors.push("IEEE 配置不完整：邮箱、密码、网址必须同时填写。");
+  let hasCompletePlatform = false;
+  for (const kind of PLATFORM_KINDS) {
+    for (let slot = 1; slot <= MAX_PLATFORM_SLOTS; slot += 1) {
+      const names = platformSecretNames(kind.key, slot);
+      const fieldNames = [names.email, names.password, names.url];
+      const any = fieldNames.some((name) => secrets[name]);
+      const all = fieldNames.every((name) => secrets[name]);
+      const label = slot === 1 ? kind.prefix : `${kind.prefix}_${slot}`;
+      if (any && !all) {
+        errors.push(`${label} 配置不完整：邮箱、密码、网址必须同时填写。`);
+      }
+      hasCompletePlatform = hasCompletePlatform || all;
+    }
   }
-  if (elsevierAny && !elsevierAll) {
-    errors.push("Elsevier 配置不完整：邮箱、密码、网址必须同时填写。");
-  }
-  if (!ieeeAll && !elsevierAll) {
+
+  if (!hasCompletePlatform) {
     errors.push("至少需要完整配置一个投稿平台。");
   }
   for (const name of ["EMAIL_SENDER", "EMAIL_PASSWORD", "EMAIL_RECEIVER"]) {
@@ -241,7 +334,9 @@ module.exports = {
   DEFAULT_REPO,
   DEFAULT_WORKFLOW,
   DEFAULT_REF,
+  MAX_PLATFORM_SLOTS,
   KEEP_EXISTING_SECRET,
+  PLATFORM_KINDS,
   SECRET_FIELDS,
   beijingHourToUtcHour,
   buildCronExpressions,
@@ -250,5 +345,6 @@ module.exports = {
   buildWranglerToml,
   mergeExistingSecretValues,
   parseWranglerToml,
+  platformSecretNames,
   validateSettings,
 };
