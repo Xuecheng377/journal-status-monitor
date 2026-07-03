@@ -31,7 +31,16 @@ async function readJsonResponse(response, fallbackMessage) {
 async function encryptSecret(value, publicKey, sodiumModule) {
   const sodium = sodiumModule || require("libsodium-wrappers");
   await sodium.ready;
-  const keyBytes = sodium.from_base64(publicKey);
+  let keyBytes;
+  try {
+    keyBytes = sodium.from_base64(publicKey);
+  } catch (error) {
+    const noPaddingVariant = sodium.base64_variants?.ORIGINAL_NO_PADDING;
+    if (!String(error?.message || error).includes("incomplete input") || !noPaddingVariant) {
+      throw error;
+    }
+    keyBytes = sodium.from_base64(publicKey, noPaddingVariant);
+  }
   const valueBytes = sodium.from_string(String(value));
   const encryptedBytes = sodium.crypto_box_seal(valueBytes, keyBytes);
   return sodium.to_base64(encryptedBytes);
