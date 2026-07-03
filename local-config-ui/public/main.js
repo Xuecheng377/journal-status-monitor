@@ -1,4 +1,5 @@
 const $ = (id) => document.getElementById(id);
+let existingSecrets = {};
 
 function intValue(id, fallback) {
   const value = Number.parseInt($(id).value, 10);
@@ -65,6 +66,32 @@ function collectTokens() {
   };
 }
 
+function applyCurrentConfig(data) {
+  if (data.repository) {
+    // Repository fields are fixed for this project in the current UI.
+  }
+  if (data.schedule?.weeklyReport) {
+    $("weeklyDay").value = String(data.schedule.weeklyReport.dayOfWeek ?? 1);
+    $("weeklyHour").value = String(data.schedule.weeklyReport.hour ?? 8);
+    $("weeklyMinute").value = String(data.schedule.weeklyReport.minute ?? 17);
+  }
+  if (data.schedule?.normalChecks) {
+    $("normalHours").value = (data.schedule.normalChecks.hours || [11, 12, 14, 17, 20, 22]).join(",");
+    $("normalMinute").value = String(data.schedule.normalChecks.minute ?? 17);
+  }
+  existingSecrets = data.existingSecrets || existingSecrets;
+  renderSecretStatus();
+}
+
+function renderSecretStatus() {
+  const ieeeConfigured = ["IEEE_EMAIL", "IEEE_PASSWORD", "IEEE_URL"].every((name) => existingSecrets[name]);
+  const elsevierConfigured = ["ELSEVIER_EMAIL", "ELSEVIER_PASSWORD", "ELSEVIER_URL"].every((name) => existingSecrets[name]);
+  $("ieeeStatus").textContent = ieeeConfigured ? "GitHub Secrets 中已有 IEEE 配置，留空保持不变" : "未检测到完整 IEEE 旧配置";
+  $("elsevierStatus").textContent = elsevierConfigured ? "GitHub Secrets 中已有 Elsevier 配置，留空保持不变" : "未检测到完整 Elsevier 旧配置";
+  $("ieeeStatus").classList.toggle("ok", ieeeConfigured);
+  $("elsevierStatus").classList.toggle("ok", elsevierConfigured);
+}
+
 function collectActions() {
   return {
     deployCloudflare: $("deployCloudflare").checked,
@@ -105,9 +132,13 @@ async function previewConfig() {
   $("preview").textContent = "";
   showMessages([]);
   try {
-    const result = await postJson("/api/preview", { settings: collectSettings() });
+    const result = await postJson("/api/preview", { settings: collectSettings(), existingSecrets });
     setStatus("预览已生成");
-    showMessages([`将更新 ${result.secrets.length} 个 GitHub Secret：${result.secrets.join(", ")}`], "ok");
+    const messages = [`将更新 ${result.secrets.length} 个 GitHub Secret：${result.secrets.join(", ") || "无"}`];
+    if (result.keptSecrets?.length) {
+      messages.push(`将保留 ${result.keptSecrets.length} 个旧 Secret：${result.keptSecrets.join(", ")}`);
+    }
+    showMessages(messages, "ok");
     $("preview").textContent = [
       "# cloudflare-scheduler/wrangler.toml",
       result.wranglerToml,
@@ -129,10 +160,12 @@ async function saveConfig() {
       settings: collectSettings(),
       tokens: collectTokens(),
       actions: collectActions(),
+      existingSecrets,
     });
     setStatus("保存完成");
     const messages = [
       `已更新 GitHub Secrets：${result.updatedSecrets.join(", ")}`,
+      `已保留旧 GitHub Secrets：${result.keptSecrets?.join(", ") || "无"}`,
       `已更新本地调度文件：${result.wranglerPath}`,
     ];
     if (result.deployResult) {
@@ -150,5 +183,30 @@ async function saveConfig() {
   }
 }
 
+async function loadCurrentConfig() {
+  setStatus("正在加载当前配置...");
+  showMessages([]);
+  try {
+    const result = await postJson("/api/current", {
+      githubToken: $("githubToken").value,
+      repository: {
+        owner: "Xuecheng377",
+        name: "journal-status-monitor",
+      },
+    });
+    applyCurrentConfig(result);
+    setStatus("当前配置已加载");
+    const count = Object.keys(existingSecrets).length;
+    showMessages([count ? `已检测到 ${count} 个 GitHub Secret。敏感值不能读取原文，留空会保持不变。` : "已加载本地时间表。GitHub Secret 状态需要填写 token 后检查。"], count ? "ok" : "warn");
+  } catch (error) {
+    setStatus("加载失败");
+    showMessages(error.errors || [String(error)], "error");
+  }
+}
+
 $("previewBtn").addEventListener("click", previewConfig);
 $("saveBtn").addEventListener("click", saveConfig);
+$("loadBtn").addEventListener("click", loadCurrentConfig);
+$("checkSecretsBtn").addEventListener("click", loadCurrentConfig);
+
+loadCurrentConfig();
