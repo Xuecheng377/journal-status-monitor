@@ -31,6 +31,7 @@ function existingPlatformSlots(platform) {
 
 function collectPlatformAdditions() {
   return Array.from(document.querySelectorAll(".platform-addition")).map((card) => ({
+    id: card.dataset.additionId,
     platform: card.querySelector("[data-field='platform']").value,
     url: card.querySelector("[data-field='url']").value,
     email: card.querySelector("[data-field='email']").value,
@@ -129,6 +130,7 @@ function addPlatformCard(initial = {}) {
   const card = document.createElement("div");
   card.className = "card platform-addition";
   card.dataset.index = String(additionCount);
+  card.dataset.additionId = initial.id || `addition-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   card.innerHTML = `
     <div class="card-title-row">
       <h3>新增投稿账号 ${additionCount}</h3>
