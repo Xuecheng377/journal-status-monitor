@@ -4,6 +4,8 @@ const {
   beijingHourToUtcHour,
   buildCronExpressions,
   buildSecrets,
+  mergeExistingSecretValues,
+  parseWranglerToml,
   buildWranglerToml,
   validateSettings,
 } = require("./config-service");
@@ -82,4 +84,48 @@ test("builds wrangler toml with repository variables and crons", () => {
   assert.match(toml, /GITHUB_REPO = "journal-status-monitor"/);
   assert.match(toml, /"17,27,37 0 \* \* 1"/);
   assert.match(toml, /"17,27,37 3,4,6,9,12,14 \* \* \*"/);
+});
+
+test("keeps existing secret values when form field is blank", () => {
+  const settings = completeSettings();
+  settings.platforms.ieee.password = "";
+  settings.email.password = "";
+  const merged = mergeExistingSecretValues(settings, {
+    IEEE_PASSWORD: true,
+    EMAIL_PASSWORD: true,
+  });
+  assert.equal(merged.IEEE_PASSWORD, "__KEEP_EXISTING_SECRET__");
+  assert.equal(merged.EMAIL_PASSWORD, "__KEEP_EXISTING_SECRET__");
+  assert.equal(Object.hasOwn(merged, "IEEE_EMAIL"), true);
+});
+
+test("validates blank secret fields when an existing secret is present", () => {
+  const settings = completeSettings();
+  settings.platforms.ieee.password = "";
+  settings.email.password = "";
+  const errors = validateSettings(settings, {
+    existingSecrets: {
+      IEEE_PASSWORD: true,
+      EMAIL_PASSWORD: true,
+    },
+  });
+  assert.deepEqual(errors, []);
+});
+
+test("parses current wrangler toml schedule into form settings", () => {
+  const parsed = parseWranglerToml(`name = "journal-status-monitor-scheduler"
+[vars]
+GITHUB_OWNER = "Xuecheng377"
+GITHUB_REPO = "journal-status-monitor"
+GITHUB_WORKFLOW = "monitor.yml"
+GITHUB_REF = "main"
+[triggers]
+crons = [
+  "17,27,37 0 * * 1",
+  "17,27,37 3,4,6,9,12,14 * * *"
+]`);
+  assert.equal(parsed.repository.owner, "Xuecheng377");
+  assert.equal(parsed.schedule.weeklyReport.dayOfWeek, 1);
+  assert.equal(parsed.schedule.weeklyReport.hour, 8);
+  assert.deepEqual(parsed.schedule.normalChecks.hours, [11, 12, 14, 17, 20, 22]);
 });
