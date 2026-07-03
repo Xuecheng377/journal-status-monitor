@@ -55,6 +55,7 @@ journal-status-monitor-scheduler
 ## 页面功能
 
 - 投稿平台：IEEE ScholarOne、Elsevier Editorial Manager；支持新增多组账号
+- 账号管理：查看已配置槽位、修改指定槽位、删除指定槽位
 - 邮件通知：发件邮箱、SMTP 授权码、收件人、SMTP 服务器和端口
 - 检查时间：每周报告时间、普通状态检查时间
 - 高级设置：终态归档、周报是否包含归档稿件、终态关键词
@@ -79,6 +80,16 @@ journal-status-monitor-scheduler
 页面会自动读取本地 `cloudflare-scheduler/wrangler.toml`，并预填当前检查时间。
 
 GitHub Secrets 不能被读回明文，这是 GitHub 的安全限制。填写 GitHub token 后，可以点击“检查已配置 Secret”查看哪些 Secret 已存在。对于已经存在的密码、授权码等敏感项，输入框可以留空；保存时会保持旧 Secret 不变。只有你填写新值时，才会覆盖对应 Secret。
+
+## 账号管理
+
+“账号管理”区域会根据 GitHub Secrets 列出当前配置的投稿账号槽位，例如 `IEEE`、`IEEE_2`、`ELSEVIER_2`。
+
+- 查看：显示槽位、平台、Secret 是否完整；密码永远不会显示。
+- 修改：点击“修改”会打开一个固定槽位的编辑表单，保存后覆盖该槽位。
+- 删除：点击“删除”会删除该槽位对应的 `EMAIL`、`PASSWORD`、`URL` 三个 GitHub Secret。
+
+GitHub Secrets 不能读取明文，所以旧账号的邮箱和网址无法自动显示。通过本地后台保存或修改过的账号，会把邮箱和网址作为非敏感元数据保存在 `local-config-ui/data/`，仅用于本地查看；密码不会保存到本地。
 
 ## 测试
 
