@@ -59,6 +59,14 @@ async function putRepoSecret({ owner, repo, token, name, value, fetchImpl = fetc
   return { name, status: "updated" };
 }
 
+async function listRepoSecrets({ owner, repo, token, fetchImpl = fetch }) {
+  const response = await fetchImpl(`${repoApiBase(owner, repo)}/actions/secrets?per_page=100`, {
+    headers: githubHeaders(token),
+  });
+  const body = await readJsonResponse(response, "Could not list repository secrets.");
+  return Object.fromEntries((body.secrets || []).map((secret) => [secret.name, true]));
+}
+
 async function dispatchWorkflow({ owner, repo, token, workflow = "monitor.yml", ref = "main", mode = "test", fetchImpl = fetch }) {
   const response = await fetchImpl(`${repoApiBase(owner, repo)}/actions/workflows/${workflow}/dispatches`, {
     method: "POST",
@@ -83,6 +91,7 @@ module.exports = {
   encryptSecret,
   getRepoPublicKey,
   githubHeaders,
+  listRepoSecrets,
   putRepoSecret,
   repoApiBase,
 };
