@@ -11,6 +11,7 @@
     <div class="brand">期刊状态监控</div>
     <nav>
       <a href="#platforms" class="active">投稿平台</a>
+      <a href="#accounts">账号管理</a>
       <a href="#email">邮件通知</a>
       <a href="#schedule">检查时间</a>
       <a href="#runtime">高级设置</a>
@@ -68,6 +69,18 @@
         <div id="platformAdditions" class="stack"></div>
         <button id="addPlatformBtn" type="button">新增一组投稿账号</button>
       </div>
+    </section>
+
+    <section id="accounts" class="panel">
+      <div class="panel-title">
+        <h2>账号管理</h2>
+        <span>可查看、修改或删除已配置的投稿账号槽位</span>
+      </div>
+      <div class="account-toolbar">
+        <button id="refreshAccountsBtn" type="button">刷新账号列表</button>
+        <span class="hint">GitHub Secrets 不能读取密码明文；邮箱和网址仅显示本地后台保存过的非敏感记录。</span>
+      </div>
+      <div id="accountList" class="account-list"></div>
     </section>
 
     <section id="email" class="panel">
