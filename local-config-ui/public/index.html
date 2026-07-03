@@ -25,6 +25,7 @@
         <p>只监听 localhost。密码和授权码通过 API 写入 GitHub Secrets，不写入仓库文件。</p>
       </div>
       <div class="header-actions">
+        <button id="loadBtn" type="button">加载当前配置</button>
         <button id="previewBtn" type="button">预览配置</button>
         <button id="saveBtn" type="button" class="primary">保存</button>
       </div>
@@ -40,13 +41,15 @@
           <h3>IEEE ScholarOne</h3>
           <label>投稿系统网址<input id="ieeeUrl" placeholder="https://mc.manuscriptcentral.com/..."></label>
           <label>登录邮箱 / 用户名<input id="ieeeEmail" autocomplete="username"></label>
-          <label>登录密码<input id="ieeePassword" type="password" autocomplete="current-password"></label>
+          <label>登录密码<input id="ieeePassword" type="password" autocomplete="current-password" placeholder="已配置时留空保持不变"></label>
+          <span id="ieeeStatus" class="secret-status">未检查旧配置</span>
         </div>
         <div class="card">
           <h3>Elsevier Editorial Manager</h3>
           <label>投稿系统网址<input id="elsevierUrl" placeholder="https://www.editorialmanager.com/..."></label>
           <label>登录邮箱 / 用户名<input id="elsevierEmail" autocomplete="username"></label>
-          <label>登录密码<input id="elsevierPassword" type="password" autocomplete="current-password"></label>
+          <label>登录密码<input id="elsevierPassword" type="password" autocomplete="current-password" placeholder="已配置时留空保持不变"></label>
+          <span id="elsevierStatus" class="secret-status">未检查旧配置</span>
         </div>
       </div>
     </section>
@@ -58,7 +61,7 @@
       </div>
       <div class="grid two">
         <label>发件邮箱<input id="emailSender" placeholder="sender@example.com"></label>
-        <label>SMTP 授权码<input id="emailPassword" type="password"></label>
+        <label>SMTP 授权码<input id="emailPassword" type="password" placeholder="已配置时留空保持不变"></label>
         <label>收件人<input id="emailReceivers" placeholder="receiver@example.com, other@example.com"></label>
         <label>SMTP 服务器<input id="smtpServer" placeholder="留空则按邮箱域名自动推断"></label>
         <label>SMTP 端口<input id="smtpPort" inputmode="numeric" placeholder="465 或 587"></label>
@@ -120,6 +123,7 @@
       <div class="grid two">
         <label>GitHub Token<input id="githubToken" type="password" placeholder="需要 Actions/Secrets 写权限"></label>
         <label>Cloudflare API Token<input id="cloudflareToken" type="password" placeholder="部署 Worker 时需要"></label>
+        <button id="checkSecretsBtn" type="button">检查已配置 Secret</button>
         <label class="check"><input id="deployCloudflare" type="checkbox" checked> 保存后部署 Cloudflare Worker</label>
         <label class="check"><input id="dispatchTest" type="checkbox"> 保存后触发测试邮件 workflow</label>
       </div>
