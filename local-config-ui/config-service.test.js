@@ -5,6 +5,7 @@ const {
   buildCronExpressions,
   buildSecrets,
   assignPlatformAdditionSlots,
+  listPlatformAccounts,
   KEEP_EXISTING_SECRET,
   mergeExistingSecretValues,
   parseWranglerToml,
@@ -204,6 +205,40 @@ test("records and reuses platform addition slot assignments", () => {
   }, first.assignments);
 
   assert.equal(retry.settings.platformAccounts.additions[0].slot, 2);
+});
+
+test("lists configured platform account slots from GitHub secrets and local metadata", () => {
+  const accounts = listPlatformAccounts(
+    {
+      IEEE_EMAIL: true,
+      IEEE_PASSWORD: true,
+      IEEE_URL: true,
+      IEEE_2_EMAIL: true,
+      IEEE_2_PASSWORD: true,
+      IEEE_2_URL: true,
+      ELSEVIER_2_EMAIL: true,
+    },
+    {
+      IEEE_2: {
+        email: "second@example.com",
+        url: "https://mc.manuscriptcentral.com/second",
+      },
+    },
+  );
+
+  assert.deepEqual(
+    accounts.map((account) => ({
+      label: account.label,
+      complete: account.complete,
+      email: account.email,
+      url: account.url,
+    })),
+    [
+      { label: "IEEE", complete: true, email: "", url: "" },
+      { label: "IEEE_2", complete: true, email: "second@example.com", url: "https://mc.manuscriptcentral.com/second" },
+      { label: "ELSEVIER_2", complete: false, email: "", url: "" },
+    ],
+  );
 });
 
 test("validates blank secret fields when an existing secret is present", () => {
