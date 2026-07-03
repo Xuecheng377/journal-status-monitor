@@ -87,7 +87,7 @@ async function writePlatformMetadata(metadata) {
   await fs.writeFile(PLATFORM_METADATA_PATH, JSON.stringify(metadata, null, 2), "utf8");
 }
 
-function collectMetadataFromSettings(settings) {
+function collectMetadataFromSettings(settings, currentMetadata = {}) {
   const updates = {};
   const platforms = settings?.platforms || {};
   for (const [platform, account] of Object.entries(platforms)) {
@@ -98,8 +98,8 @@ function collectMetadataFromSettings(settings) {
     updates[label] = {
       platform,
       slot: 1,
-      email: account.email || "",
-      url: account.url || "",
+      email: account.email || currentMetadata[label]?.email || "",
+      url: account.url || currentMetadata[label]?.url || "",
       updatedAt: new Date().toISOString(),
     };
   }
@@ -112,8 +112,8 @@ function collectMetadataFromSettings(settings) {
     updates[label] = {
       platform: account.platform,
       slot: account.slot,
-      email: account.email || "",
-      url: account.url || "",
+      email: account.email || currentMetadata[label]?.email || "",
+      url: account.url || currentMetadata[label]?.url || "",
       updatedAt: new Date().toISOString(),
     };
   }
@@ -306,10 +306,12 @@ async function handleSave(req, res) {
   }
 
   await fs.writeFile(WRANGLER_PATH, buildWranglerToml(settingsWithSlots), "utf8");
-  await writePlatformMetadata({
-    ...(await readPlatformMetadata()),
-    ...collectMetadataFromSettings(settingsWithSlots),
-  });
+  const currentMetadata = await readPlatformMetadata();
+  const nextMetadata = {
+    ...currentMetadata,
+    ...collectMetadataFromSettings(settingsWithSlots, currentMetadata),
+  };
+  await writePlatformMetadata(nextMetadata);
 
   let deployResult = null;
   if (actions.deployCloudflare) {
@@ -332,6 +334,12 @@ async function handleSave(req, res) {
     });
   }
 
+  const refreshedSecrets = await listRepoSecrets({
+    owner: repo.owner,
+    repo: repo.repo,
+    token: tokens.githubToken.trim(),
+  });
+
   jsonResponse(res, 200, {
     ok: true,
     updatedSecrets: updatedSecrets.sort(),
@@ -339,6 +347,8 @@ async function handleSave(req, res) {
     wranglerPath: WRANGLER_PATH,
     deployResult,
     workflowResult,
+    existingSecrets: refreshedSecrets,
+    accounts: listPlatformAccounts(refreshedSecrets, nextMetadata),
   });
 }
 
