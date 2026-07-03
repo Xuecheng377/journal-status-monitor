@@ -51,7 +51,7 @@ async function encryptSecret(value, publicKey, sodiumModule) {
   }
   const valueBytes = sodium.from_string(String(value));
   const encryptedBytes = sodium.crypto_box_seal(valueBytes, keyBytes);
-  return sodium.to_base64(encryptedBytes);
+  return sodium.to_base64(encryptedBytes, sodium.base64_variants?.ORIGINAL);
 }
 
 async function getRepoPublicKey({ owner, repo, token, fetchImpl = fetch }) {
