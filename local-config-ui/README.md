@@ -54,11 +54,25 @@ journal-status-monitor-scheduler
 
 ## 页面功能
 
-- 投稿平台：IEEE ScholarOne、Elsevier Editorial Manager
+- 投稿平台：IEEE ScholarOne、Elsevier Editorial Manager；支持新增多组账号
 - 邮件通知：发件邮箱、SMTP 授权码、收件人、SMTP 服务器和端口
 - 检查时间：每周报告时间、普通状态检查时间
 - 高级设置：终态归档、周报是否包含归档稿件、终态关键词
 - 保存部署：写入 GitHub Secrets、可选部署 Cloudflare、可选触发测试邮件 workflow
+
+## 新增账号规则
+
+页面里的“已有旧配置”区域对应最早的一组 Secret：
+
+- `IEEE_EMAIL` / `IEEE_PASSWORD` / `IEEE_URL`
+- `ELSEVIER_EMAIL` / `ELSEVIER_PASSWORD` / `ELSEVIER_URL`
+
+如果你要新增论文或新增投稿账号，请使用“新增投稿账号”区域。新增内容会写入下一个空槽位，例如：
+
+- `IEEE_2_EMAIL` / `IEEE_2_PASSWORD` / `IEEE_2_URL`
+- `ELSEVIER_2_EMAIL` / `ELSEVIER_2_PASSWORD` / `ELSEVIER_2_URL`
+
+新增账号不会覆盖 `IEEE_EMAIL` 或 `ELSEVIER_EMAIL` 这一组旧配置。当前每个平台最多支持 5 组账号。
 
 ## 旧配置读取
 
