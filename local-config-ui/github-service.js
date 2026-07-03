@@ -31,15 +31,23 @@ async function readJsonResponse(response, fallbackMessage) {
 async function encryptSecret(value, publicKey, sodiumModule) {
   const sodium = sodiumModule || require("libsodium-wrappers");
   await sodium.ready;
+  const variants = [
+    sodium.base64_variants?.ORIGINAL,
+    undefined,
+    sodium.base64_variants?.ORIGINAL_NO_PADDING,
+  ];
   let keyBytes;
-  try {
-    keyBytes = sodium.from_base64(publicKey);
-  } catch (error) {
-    const noPaddingVariant = sodium.base64_variants?.ORIGINAL_NO_PADDING;
-    if (!String(error?.message || error).includes("incomplete input") || !noPaddingVariant) {
-      throw error;
+  let lastError;
+  for (const variant of variants) {
+    try {
+      keyBytes = variant === undefined ? sodium.from_base64(publicKey) : sodium.from_base64(publicKey, variant);
+      break;
+    } catch (error) {
+      lastError = error;
     }
-    keyBytes = sodium.from_base64(publicKey, noPaddingVariant);
+  }
+  if (!keyBytes) {
+    throw lastError || new Error("Could not decode GitHub public key.");
   }
   const valueBytes = sodium.from_string(String(value));
   const encryptedBytes = sodium.crypto_box_seal(valueBytes, keyBytes);
